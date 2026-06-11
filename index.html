@@ -1139,8 +1139,9 @@ body{background:#D8E3F5;min-height:100vh}
 <span class="s" onclick="setStar(5)">⭐</span>
 </div>
 <div style="margin-bottom:14px">
-<span class="inp-label">Comentário (opcional)</span>
-<textarea class="inp" rows="3" placeholder="Ex: Organização excelente, pagamento no prazo, ambiente agradável..." style="resize:none"></textarea>
+<span class="inp-label" id="aval-coment-label">Comentário (opcional)</span>
+<textarea class="inp" id="aval-coment-text" rows="3" placeholder="Ex: Organização excelente, pagamento no prazo, ambiente agradável..." style="resize:none" oninput="atualizarLabelComent()"></textarea>
+<div id="aval-coment-count" style="font-size:11px;color:var(--gray);margin-top:4px;text-align:right;display:none">0/30</div>
 </div>
 <button class="btn btn-primary btn-block" style="margin-bottom:12px" onclick="enviarAvaliacao()">Enviar avaliação</button>
 <button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-avaliar')">Cancelar</button>
@@ -4601,6 +4602,24 @@ starRating = n;
 document.querySelectorAll('.star-input .s').forEach((s,i)=>{
 s.classList.toggle('on', i < n);
 });
+atualizarLabelComent();
+}
+
+function atualizarLabelComent(){
+const label = document.getElementById('aval-coment-label');
+const count = document.getElementById('aval-coment-count');
+const ta = document.getElementById('aval-coment-text');
+if(!label || !ta) return;
+const len = ta.value.trim().length;
+if(starRating <= 2 && starRating > 0){
+label.textContent = 'Justificativa (obrigatória — mín. 30 caracteres)';
+label.style.color = 'var(--red)';
+if(count){ count.style.display='block'; count.textContent = len+'/30'; count.style.color = len>=30?'var(--green)':'var(--red)'; }
+} else {
+label.textContent = 'Comentário (opcional)';
+label.style.color = '';
+if(count) count.style.display = 'none';
+}
 }
 // Abre o modal de avaliação com contexto real da vaga
 function abrirModalAvaliar(vagaId, contratacaoId, avaliandoTipo, avaliandoId){
@@ -4631,6 +4650,12 @@ async function enviarAvaliacao(){
 if(!starRating){ showToast('Selecione uma nota!'); return; }
 const comentarioEl = document.querySelector('#modal-avaliar textarea');
 const comentario   = comentarioEl?.value?.trim() || null;
+// Nota ≤ 2 exige comentário com mínimo 30 chars
+if(starRating <= 2 && (!comentario || comentario.length < 30)){
+showToast('Notas baixas exigem uma justificativa de pelo menos 30 caracteres.');
+comentarioEl?.focus();
+return;
+}
 const btn = document.querySelector('#modal-avaliar .btn-primary');
 if(btn){ btn.textContent = 'Enviando...'; btn.disabled = true; }
 // ── PERSISTE NO SUPABASE ──────────────────────────────
@@ -4645,6 +4670,7 @@ const { vagaId, contratacaoId, avaliandoTipo, avaliandoId } = avaliacaoAtiva;
 const { error } = await sb.from('avaliacoes').insert({
 contratacao_id:   contratacaoId || null,
 avaliador_tipo:   loginType === 'emp' ? 'empresa' : 'profissional',
+avaliado_tipo:    loginType === 'emp' ? 'profissional' : 'empresa',
 avaliado_id:      avaliandoId   || null,
 nota:             starRating,
 comentario:       comentario,
@@ -5054,9 +5080,9 @@ ${isConvite ? `
 </div>` : (() => {
 // Esconde botao Desistir se o evento ja terminou
 const fimEvento = vd?.hora_termino ? new Date(vd.hora_termino) : null;
-const eventoPassou = fimEvento && new Date()> fimEvento;
-if(eventoPassou){
-const empNome = vd?.empresas?.nome || 'a empresa';
+const eventoPassou = fimEvento && new Date() > fimEvento;
+if(eventoPassou || !fimEvento === false){
+const empNome = vd?.empresas?.nome || vd?.empresa || 'a empresa';
 return `<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Evento encerrado</div>
 <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;width:100%;border:1px solid var(--border)" onclick="abrirAvaliacaoEmpresa('${c.id}','${empNome}')">⭐ Avaliar empresa</button>`;
 }
