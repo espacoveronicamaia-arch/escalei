@@ -1112,7 +1112,7 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 </div>
 <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:13px;margin-bottom:8px">Descrição</div>
-<div style="font-size:13px;color:var(--gray);line-height:1.7;margin-bottom:20px">Evento de casamento para 200 convidados. Procuramos garçom experiente em fine dining, com boa postura e experiência em serviço de mesa. Traje: social escuro.</div>
+<div id="modal-vaga-desc" style="font-size:13px;color:var(--gray);line-height:1.7;margin-bottom:20px">—</div>
 <div id="modal-vaga-status" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--radius-sm);border:1px solid transparent;font-size:12px;font-weight:600;margin-bottom:16px"></div>
 <button class="btn btn-primary btn-block" id="btn-candidatar" style="margin-bottom:12px" onclick="candidatar()">Candidatar-se a esta vaga</button>
 <button class="btn btn-danger btn-block" id="btn-desistir" style="margin-bottom:12px;display:none" onclick="desistirCandidatura()">Desistir da candidatura</button>
@@ -1640,6 +1640,8 @@ document.getElementById('modal-vaga-fn').textContent = vl.fn;
 document.getElementById('modal-vaga-data').textContent = vl.data;
 document.getElementById('modal-vaga-hora').textContent = vl.hora;
 document.getElementById('modal-vaga-val').textContent = vl.val;
+const descEl1 = document.getElementById('modal-vaga-desc');
+if(descEl1) descEl1.textContent = vl.descricao || vl.desc || '—';
 const btn = document.getElementById('btn-candidatar');
 const statusWrap = document.getElementById('modal-vaga-status');
 if(jaCandidata){
@@ -2218,6 +2220,7 @@ data:ini.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'
 hora:`${ini.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}–${fim.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
 local:v.local||'Uberlândia', val:`R$ ${parseFloat(v.valor).toFixed(0)}`, borda:'var(--blue-mid)',
 dataISO: v.hora_termino || null,
+descricao: v.descricao || null,
 });
 });
 // Carrega candidaturas do profissional logado para marcar vagas corretamente
@@ -2871,7 +2874,7 @@ const vagaIdReal = c.fromBanco
 const profissionalId = c.profissional_id
 || (v?._candidaturaIds?.[nome])
 || null;
-const candidatoCompleto = { ...c, profissional_id: profissionalId };
+const candidatoCompleto = { ...c, profissional_id: profissionalId, usuario_id: c.profissionais?.usuario_id || c.usuario_id || null };
 candidatoAtivo = {candidato: candidatoCompleto, vaga: v};
 const encerrada = v && vagaEncerrada(v);
 const jaContratado = v && v.contratados.includes(nome);
@@ -2981,6 +2984,8 @@ document.getElementById('modal-vaga-fn').textContent = v.fn;
 document.getElementById('modal-vaga-data').textContent = v.data;
 document.getElementById('modal-vaga-hora').textContent = v.hora;
 document.getElementById('modal-vaga-val').textContent = v.val;
+const descEl2 = document.getElementById('modal-vaga-desc');
+if(descEl2) descEl2.textContent = v.descricao || v.desc || '—';
 const btn = document.getElementById('btn-candidatar');
 const statusWrap = document.getElementById('modal-vaga-status');
 if(encerrada){
@@ -3207,6 +3212,15 @@ renderEmpHistorico();
 renderEmpVagasList();
 const primeiroNome = candidato.nome.split(' ')[0];
 showToast(`✅ ${primeiroNome} contratado(a)!`);
+// Envia notificação persistente para o profissional
+if(candidato.usuario_id){
+sb.rpc('inserir_notificacao', {
+p_usuario_id: candidato.usuario_id,
+p_titulo: '🎉 Você foi contratado!',
+p_mensagem: `${CURRENT_PROFILE?.nome || 'Uma empresa'} confirmou sua contratação para "${vaga.titulo || vaga.title || 'o evento'}". Boa sorte!`,
+p_icone: '🎉'
+}).catch(e => console.warn('notif contratacao:', e.message));
+}
 candidatoAtivo = null;
 }
 // ─── EDITAR VAGA ──────────────────────────────────────
@@ -3624,7 +3638,10 @@ Cancelar participação
 const PROF = {
 get eventos()   { return HISTORICO_PROF.length; },
 get nota()      { const avs=HISTORICO_PROF.filter(e=>e.nota!==null&&e.nota!==undefined); if(!avs.length) return 0; const m=avs.reduce((s,e)=>s+e.nota,0)/avs.length; return isNaN(m)?0:Math.round(m*10)/10; },
-get faturado()  { return HISTORICO_PROF.reduce((s,e)=>s+e.val,0); },
+get faturado()  {
+const agora = new Date();
+return HISTORICO_PROF.filter(e => e.data_raw && new Date(e.data_raw) < agora).reduce((s,e)=>s+e.val,0);
+},
 presenca:  0,
 rankPos:   9999,
 fns:       [],
