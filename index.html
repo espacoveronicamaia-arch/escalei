@@ -2309,7 +2309,7 @@ return;
 // Busca vagas + candidaturas + nome do profissional via join
 // Busca vagas da empresa
 const { data, error } = await sb.from('vagas')
-.select('*')
+.select('*, eventos(nome, local)')
 .eq('empresa_id', CURRENT_PROFILE.id)
 .order('created_at', { ascending: false });
 if(error){ console.warn('vagas error:', error.message); return; }
@@ -2410,6 +2410,10 @@ if(VAGAS[v.id]){
 VAGAS[v.id].dataISO = v.hora_termino;
 VAGAS[v.id].encerradaManual = v.status === 'encerrada' || v.status === 'preenchida';
 VAGAS[v.id].totalVagas = v.total_vagas;
+VAGAS[v.id].evento_id = v.evento_id || null;
+VAGAS[v.id].inicioISO = v.data_evento;
+VAGAS[v.id].terminoISO = v.hora_termino;
+VAGAS[v.id].evento_nome = v.eventos?.nome || null;
 // Atualiza mapa profissional_id -> contratacao_id
 const contsV2 = contsConfirmadas.filter(c => c.vaga_id === v.id);
 if(contsV2.length) VAGAS[v.id]._contratacaoIdByProf = Object.fromEntries(contsV2.map(c=>[c.profissional_id, c.id]));
@@ -2432,6 +2436,10 @@ c.profissional_id.slice(0,8)
 ),
 encerradaManual: v.status === 'encerrada' || v.status === 'preenchida',
 dataISO: v.hora_termino,
+evento_id: v.evento_id || null,
+inicioISO: v.data_evento,
+terminoISO: v.hora_termino,
+evento_nome: v.eventos?.nome || null,
 // Guarda mapa profissional_id → nome para usar na contratação
 _candidaturaIds: Object.fromEntries(
 (v.candidaturas || []).map(c => [
@@ -4214,6 +4222,25 @@ document.querySelectorAll('#vagas-emp-filter-bar .chip').forEach(c=>c.classList.
 btn.classList.add('active');
 renderEmpVagasList();
 }
+// ─── AGRUPAR VAGAS POR EVENTO (janela derivada no front, sem trigger) ───
+// Vagas sem evento_id viram grupo próprio (solo). Janela do evento:
+// inicio = funcao mais cedo, termino = funcao mais tarde (escalonado).
+function agruparVagasPorEvento(vagas){
+const grupos = new Map();
+(vagas||[]).forEach(v=>{
+const chave = v.evento_id || ('solo:'+v.id);
+if(!grupos.has(chave)){
+grupos.set(chave, { evento_id: v.evento_id||null, nome: v.evento_nome || v.title || 'Evento', funcoes: [], _ini: null, _fim: null });
+}
+const g = grupos.get(chave);
+g.funcoes.push(v);
+const ini = v.inicioISO ? new Date(v.inicioISO) : null;
+const fim = v.terminoISO ? new Date(v.terminoISO) : null;
+if(ini && (!g._ini || ini < g._ini)) g._ini = ini;
+if(fim && (!g._fim || fim > g._fim)) g._fim = fim;
+});
+return [...grupos.values()].map(g=>({ evento_id: g.evento_id, nome: g.nome, funcoes: g.funcoes, inicio: g._ini, termino: g._fim }));
+}
 function renderEmpVagasList(){
 const wrap = document.getElementById('emp-vagas-list');
 if(!wrap) return;
@@ -4243,7 +4270,7 @@ ${empVagaFiltro==='Ativas'?`<button class="btn btn-primary btn-sm" onclick="abri
 </div>`;
 return;
 }
-wrap.innerHTML = filtradas.map(v=>{
+const renderFuncaoCard = (v)=>{
 const enc = vagaEncerrada(v);
 const rest = vagasRestantes(v);
 return `<div class="emp-vaga-card${enc?' vaga-encerrada':''}" style="margin-bottom:0" onclick="${enc?'':` abrirCandidatos('${v.id}')`}">
@@ -4285,7 +4312,21 @@ ${(()=>{ const fim = v.dataISO ? new Date(v.dataISO) : null; return fim && fim> 
 </div>`
 }
 </div><div style="height:12px"></div>`;
-}).join('');
+};
+const cabecalhoEvento = (g)=>{
+const fmtData = g.inicio  ? g.inicio.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}) : '';
+const fmtIni  = g.inicio  ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})  : '';
+const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+return `<div style="margin:4px 0 8px;padding:10px 12px;background:rgba(31,77,58,.06);border-radius:12px">
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${g.nome}</div>
+<div style="font-size:12px;color:var(--gray);margin-top:2px">${fmtData} · ${fmtIni}–${fmtFim} · ${g.funcoes.length} funções</div>
+</div>`;
+};
+wrap.innerHTML = agruparVagasPorEvento(filtradas).map(g =>
+g.funcoes.length === 1
+? renderFuncaoCard(g.funcoes[0])
+: cabecalhoEvento(g) + g.funcoes.map(renderFuncaoCard).join('')
+).join('');
 }
 // ─── HISTÓRICO EMPRESA ────────────────────────────────
 // ─── PLANOS ────────────────────────────────────────────
