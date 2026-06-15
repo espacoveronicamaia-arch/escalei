@@ -3900,12 +3900,9 @@ const novoNome = document.getElementById('edit-nome-val')?.value.trim();
 PROF.fns = novasFns;
 // Salva no Supabase
 try {
-if(CURRENT_USER && novoNome){
-await sb.auth.updateUser({ data: { nome: novoNome } });
-// Também atualiza a coluna nome em profissionais para o ranking sincronizar
-if(CURRENT_PROFILE?.id){
+// Atualiza nome na tabela profissionais (usada pelo ranking)
+if(CURRENT_PROFILE?.id && novoNome){
 await sb.from('profissionais').update({ nome: novoNome }).eq('id', CURRENT_PROFILE.id);
-}
 }
 if(CURRENT_PROFILE?.id){
 await sb.from('profissionais').update({ funcoes: novasFns }).eq('id', CURRENT_PROFILE.id);
@@ -4999,8 +4996,8 @@ const agora = new Date();
 const proximoEvento = CONTRATACOES_PROF
 .filter(c => c.status === 'confirmado' && c.vagaDetalhes?.data_evento)
 .map(c => ({ ...c, _inicio: new Date(c.vagaDetalhes.data_evento), _fim: new Date(c.vagaDetalhes.hora_termino) }))
-.filter(c => c._fim> agora)
-.sort((a,b) => a._inicio - b._inicio)[0] || null;
+.filter(c => c._fim > agora) // Mostra countdown para qualquer evento que ainda não terminou
+.sort((a,b) => a._inicio - b._inicio)[0] || null; // Ordena por início mais próximo
 // Para o intervalo anterior se existir
 if(_countdownInterval){ clearInterval(_countdownInterval); _countdownInterval = null; }
 let countdownHTML = '';
@@ -5011,20 +5008,23 @@ const local   = vd?.local || '—';
 const horaIni = proximoEvento._inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const horaFim = proximoEvento._fim.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const dataFmt = proximoEvento._inicio.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-const emAndamento = agora>= proximoEvento._inicio && agora <= proximoEvento._fim;
+const emAndamento = agora >= proximoEvento._inicio && agora < proximoEvento._fim;
+const atrasado = agora > proximoEvento._fim; // Passou da hora de terminar
+const statusLabel = atrasado ? '⏱️ ATRASADO' : (emAndamento ? '🟢 EM ANDAMENTO' : '📅 PRÓXIMO EVENTO');
+const tempoLabel = atrasado ? 'Terminou há' : (emAndamento ? 'Termina em' : 'Começa em');
 countdownHTML = `
 <div style="margin:0 20px 16px;background:linear-gradient(135deg,var(--navy),#1a4060);border-radius:var(--radius);padding:16px;color:white">
-<div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.7;margin-bottom:6px">${emAndamento ? '🟢 EM ANDAMENTO' : '📅 PRÓXIMO EVENTO'}</div>
+<div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.7;margin-bottom:6px">${statusLabel}</div>
 <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:15px;margin-bottom:2px">${vd?.titulo || 'Evento confirmado'}</div>
 <div style="font-size:12px;opacity:.8;margin-bottom:10px">${empresa} · ${local}</div>
 <div style="font-size:11px;opacity:.7;margin-bottom:8px">${dataFmt} · ${horaIni}–${horaFim}</div>
 <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:10px;text-align:center">
-<div style="font-size:10px;opacity:.7;margin-bottom:4px">${emAndamento ? 'Termina em' : 'Começa em'}</div>
+<div style="font-size:10px;opacity:.7;margin-bottom:4px">${tempoLabel}</div>
 <div id="countdown-timer" style="font-family:'Sora',sans-serif;font-weight:700;font-size:22px;letter-spacing:2px">--:--:--</div>
 </div>
 </div>`;
 // Inicia contagem regressiva
-const alvo = emAndamento ? proximoEvento._fim : proximoEvento._inicio;
+const alvo = atrasado ? proximoEvento._fim : (emAndamento ? proximoEvento._fim : proximoEvento._inicio);
 function atualizarContagem(){
 // Revalida: se o evento mudou de status ou foi encerrado, para
 const eventoAtualizado = CONTRATACOES_PROF.find(c => c.id === proximoEvento.id);
@@ -5034,16 +5034,20 @@ _countdownInterval = null;
 renderContratacoesProfHome();
 return;
 }
-const diff = alvo - new Date();
-if(diff <= 0){
+const agora2 = new Date();
+let diff = alvo - agora2;
+// Se passou e é futuro/emAndamento, renderiza novamente
+if(diff < -300000){ // 5 min de tolerância
 clearInterval(_countdownInterval);
 _countdownInterval = null;
 renderContratacoesProfHome();
 return;
 }
-const h = Math.floor(diff / 3600000);
-const m = Math.floor((diff % 3600000) / 60000);
-const s = Math.floor((diff % 60000) / 1000);
+// Mostra tempo absoluto (sempre positivo)
+const absDiff = Math.abs(diff);
+const h = Math.floor(absDiff / 3600000);
+const m = Math.floor((absDiff % 3600000) / 60000);
+const s = Math.floor((absDiff % 60000) / 1000);
 const el = document.getElementById('countdown-timer');
 if(el) el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
@@ -5104,7 +5108,7 @@ ${isConvite ? `
 // Esconde botao Desistir se o evento ja terminou
 const fimEvento = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const eventoPassou = fimEvento && new Date() > fimEvento;
-if(eventoPassou || !fimEvento === false){
+if(eventoPassou){ // Avaliação SÓ depois que evento termina
 const empNome = vd?.empresas?.nome || vd?.empresa || 'a empresa';
 return `<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Evento encerrado</div>
 <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;width:100%;border:1px solid var(--border)" onclick="abrirAvaliacaoEmpresa('${c.id}','${empNome}')">⭐ Avaliar empresa</button>`;
