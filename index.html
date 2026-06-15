@@ -5137,11 +5137,19 @@ document.getElementById('desistir-cont-titulo').textContent = titulo;
 document.getElementById('btn-confirmar-desistir-cont').onclick = () => desistirContratacao(id);
 }
 async function recarregarPerfil(){
-const tabelaProfissional = (CURRENT_PROFILE?.tipo === 'empresa' || CURRENT_PROFILE?.usuario_id !== auth.currentUser.id) ? 'empresas' : 'profissionais';
-const { data: prof } = await sb.from(tabelaProfissional)
+// Tenta profissionais primeiro (tem CPF)
+let { data: prof } = await sb.from('profissionais')
 .select('*')
 .eq('id', CURRENT_PROFILE.id)
 .single();
+// Se não encontrar, é empresa
+if(!prof){
+const result = await sb.from('empresas')
+.select('*')
+.eq('id', CURRENT_PROFILE.id)
+.single();
+prof = result.data;
+}
 if(prof){ Object.assign(CURRENT_PROFILE, prof); }
 }
 async function desistirContratacao(id){
