@@ -4381,17 +4381,7 @@ console.warn('registrar_falta retornou erro:', rpcData?.erro);
 e.faltas = rpcData.total_faltas;
 await logEvent('falta_registrada', vagaId, 'vaga', { profissional_id: profissionalId, profissional_nome: nomeProfissional });
 }
-// 2. Atualiza candidatura para 'faltou'
-await sb.from('candidaturas')
-.update({ status: 'faltou', updated_at: new Date().toISOString() })
-.eq('vaga_id', vagaId)
-.eq('profissional_id', profissionalId);
-}
-// 3. Reabre vaga no banco
-if(v){
-await sb.from('vagas')
-.update({ status: 'ativa', total_vagas: v.totalVagas })
-.eq('id', vagaId);
+// A RPC registrar_falta já marca a candidatura como 'faltou' e reabre a vaga no servidor.
 }
 } catch(err){
 console.error('Erro ao persistir falta:', err);
@@ -5392,47 +5382,35 @@ metadata:    metadata,
 //         < 24h     = conta como falta
 async function cancelarParticipacao(contratacaoId, vagaId, dataEventoISO){
 if(!CURRENT_USER || !CURRENT_PROFILE?.id) return;
-const agora        = new Date();
-const dataEvento   = new Date(dataEventoISO);
-const horasAte     = (dataEvento - agora) / (1000 * 60 * 60);
-let penalidade = 'nenhuma';
-let msg = '';
+const horasAte = (new Date(dataEventoISO) - new Date()) / (1000 * 60 * 60);
 if(horasAte < 0){
-showToast('O evento já ocorreu. Use "Não comparecer" para registrar ausência.');
+showToast('O evento já começou. Não é possível cancelar por aqui.');
 return;
-} else if(horasAte < 24){
-penalidade = 'falta';
-msg = 'Cancelamento com menos de 24h conta como falta e gera bloqueio. Confirmar?';
-} else if(horasAte < 72){
-penalidade = 'alerta';
-msg = 'Cancelamento com menos de 72h ficará registrado no seu histórico. Confirmar?';
-} else {
-msg = 'Cancelar participação neste evento? Não haverá penalidade.';
 }
+const msg = horasAte < 24
+? 'Cancelamento com menos de 24h conta como FALTA e gera bloqueio. Confirmar?'
+: horasAte < 72
+? 'Cancelamento com menos de 72h ficará registrado como advertência no seu histórico. Confirmar?'
+: 'Cancelar participação neste evento? Não haverá penalidade.';
 if(!confirm(msg)) return;
 try {
-// Atualiza candidatura para cancelado
-await sb.from('candidaturas')
-.update({ status: 'cancelado', updated_at: new Date().toISOString() })
-.eq('vaga_id', vagaId)
-.eq('profissional_id', CURRENT_PROFILE.id);
-// Se menos de 24h, registra como falta
-if(penalidade === 'falta'){
-const meuNome = CURRENT_PROFILE?.nome
-|| CURRENT_USER.user_metadata?.nome
-|| 'Profissional';
-await registrarFalta(vagaId, meuNome, 'profissional', CURRENT_PROFILE.id);
+// A RPC cancelar_participacao decide a penalidade no servidor (>72h nada, 24-72h advertência, <24h falta)
+const { data, error } = await sb.rpc('cancelar_participacao', { p_contratacao_id: contratacaoId });
+if(error || !data?.ok){
+showToast(data?.erro || 'Erro ao cancelar. Tente novamente.');
+console.warn('cancelar_participacao:', error?.message || data?.erro);
+return;
 }
 await logEvent('candidatura_cancelada', vagaId, 'vaga', {
-penalidade,
+penalidade: data.penalidade,
 horas_antecedencia: Math.round(horasAte),
 });
 await carregarHistoricoBanco();
 await carregarVagasBanco();
-showToast(penalidade === 'falta'
-? 'Participação cancelada. Falta registrada.'
-: penalidade === 'alerta'
-? 'Participação cancelada. Alerta registrado no histórico.'
+showToast(data.penalidade === 'falta'
+? (data.banido ? 'Cancelado. Você foi banido após a 4ª falta.' : 'Cancelado. Falta registrada e bloqueio aplicado.')
+: data.penalidade === 'advertencia'
+? 'Cancelado. Advertência registrada no seu histórico.'
 : 'Participação cancelada sem penalidade.');
 } catch(e){
 console.error('cancelarParticipacao:', e.message);
