@@ -2125,9 +2125,13 @@ notasPorContratacao[a.contratacao_id] = a.nota;
 });
 } catch(e) { console.warn('avaliacoes historico:', e.message); }
 HISTORICO_PROF.length = 0;
+const agoraHist = new Date();
 data.forEach(c => {
 const v = c.vagas;
 if(!v) return;
+// Só conta como evento realizado (ganho/presença) se o horário de término já passou.
+// Antes disso a contratação está confirmada, mas o evento ainda não aconteceu.
+if(!v.hora_termino || new Date(v.hora_termino) > agoraHist) return;
 const nota = notasPorContratacao[c.id] ?? null;
 HISTORICO_PROF.push({
 id: c.id,
@@ -3639,8 +3643,9 @@ const PROF = {
 get eventos()   { return HISTORICO_PROF.length; },
 get nota()      { const avs=HISTORICO_PROF.filter(e=>e.nota!==null&&e.nota!==undefined); if(!avs.length) return 0; const m=avs.reduce((s,e)=>s+e.nota,0)/avs.length; return isNaN(m)?0:Math.round(m*10)/10; },
 get faturado()  {
-const agora = new Date();
-return HISTORICO_PROF.filter(e => e.data_raw && new Date(e.data_raw) < agora).reduce((s,e)=>s+e.val,0);
+// HISTORICO_PROF já contém apenas eventos cujo término passou,
+// então tudo aqui é ganho realizado.
+return HISTORICO_PROF.reduce((s,e)=>s+e.val,0);
 },
 presenca:  0,
 rankPos:   9999,
