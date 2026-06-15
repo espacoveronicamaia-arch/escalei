@@ -3905,6 +3905,9 @@ await sb.auth.updateUser({ data: { nome: novoNome } });
 }
 if(CURRENT_PROFILE?.id){
 await sb.from('profissionais').update({ funcoes: novasFns }).eq('id', CURRENT_PROFILE.id);
+CURRENT_PROFILE.funcoes = novasFns;
+// Reconstrói o ranking para refletir as novas funções na mesma sessão
+await carregarRankingBanco();
 }
 } catch(e){ console.warn('Erro ao salvar perfil:', e); }
 // Atualiza UI
@@ -5704,6 +5707,8 @@ CURRENT_PROFILE.funcoes = _onbFuncoesSel;
 PROF.fns = _onbFuncoesSel;
 if(document.getElementById('perfil-fn'))
 document.getElementById('perfil-fn').textContent = _onbFuncoesSel.join(' · ');
+// Reconstrói o ranking para já incluir as funções escolhidas
+await carregarRankingBanco();
 }
 if(btn){ btn.textContent = 'Salvar e continuar →'; btn.disabled = false; }
 onbProximo();
