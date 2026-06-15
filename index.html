@@ -5136,28 +5136,34 @@ openModal('modal-desistir-contratacao');
 document.getElementById('desistir-cont-titulo').textContent = titulo;
 document.getElementById('btn-confirmar-desistir-cont').onclick = () => desistirContratacao(id);
 }
+async function recarregarPerfil(){
+const tabelaProfissional = (CURRENT_PROFILE?.tipo === 'empresa' || CURRENT_PROFILE?.usuario_id !== auth.currentUser.id) ? 'empresas' : 'profissionais';
+const { data: prof } = await sb.from(tabelaProfissional)
+.select('*')
+.eq('id', CURRENT_PROFILE.id)
+.single();
+if(prof){ Object.assign(CURRENT_PROFILE, prof); }
+}
 async function desistirContratacao(id){
 const btn = document.getElementById('btn-confirmar-desistir-cont');
 if(btn){ btn.textContent = 'Desistindo...'; btn.disabled = true; }
-// Guarda dados antes de alterar (precisamos do vaga_id para reabrir)
-const contratacao = CONTRATACOES_PROF.find(c => c.id === id);
-const vagaId = contratacao?.vaga_id;
-const { error } = await sb.from('contratacoes')
-.update({ status: 'desistiu' })
-.eq('id', id);
-if(error){
-showToast('Erro ao desistir. Tente novamente.');
+// Chama a RPC que aplica as penalidades (falta se <24h, advertência se 24-72h, nada se >72h)
+const { data, error } = await sb.rpc('cancelar_participacao', { p_contratacao_id: id });
+if(error || !data?.ok){
+showToast('Erro ao desistir: ' + (error?.message || data?.erro || 'Tente novamente.'));
 if(btn){ btn.textContent = 'Confirmar desistência'; btn.disabled = false; }
 return;
 }
-// A trigger trg_reabrir_vaga_apos_desistencia no banco cuida de reabrir a vaga
-// Candidatura vai para 'desistiu' — profissional não aparece mais como candidato
-// (pode se re-candidatar novamente se quiser)
-if(vagaId){
-try {
-await sb.from('candidaturas').update({ status: 'desistiu' })
-.eq('vaga_id', vagaId).eq('profissional_id', CURRENT_PROFILE.id);
-} catch(e){ console.warn('candidatura desistiu:', e.message); }
+// Mostra penalidade
+if(data.penalidade === 'falta'){
+const diasBloqueio = data.total_faltas === 1 ? 7 : (data.total_faltas === 2 ? 21 : 30);
+showToast(`❌ Cancelamento <24h = FALTA registrada. Bloqueado por ${diasBloqueio} dias.`);
+// Recarrega perfil para atualizar bloqueado_ate
+await recarregarPerfil();
+} else if(data.penalidade === 'advertencia'){
+showToast('⚠️ Cancelamento com 24-72h: advertência registrada.');
+} else {
+showToast('✅ Cancelamento confirmado sem penalidade.');
 }
 // Remove local e atualiza UI
 CONTRATACOES_PROF = CONTRATACOES_PROF.filter(c => c.id !== id);
@@ -5212,6 +5218,22 @@ openModal('modal-convite-emp');
 async function enviarConviteEmp(nome, profissionalId, vagaId){
 const btn = document.getElementById('btn-confirmar-convite');
 btn.textContent = 'Enviando...'; btn.disabled = true;
+// NOVO: Valida se profissional está bloqueado
+const { data: profData } = await sb.from('profissionais')
+.select('bloqueado_ate, banido')
+.eq('id', profissionalId)
+.single();
+if(profData?.banido){
+showToast(`❌ ${nome.split(' ')[0]} está banido permanentemente.`);
+btn.textContent='Enviar convite'; btn.disabled=false;
+return;
+}
+if(profData?.bloqueado_ate && new Date(profData.bloqueado_ate) > new Date()){
+const dias = Math.ceil((new Date(profData.bloqueado_ate) - new Date()) / (1000*60*60*24));
+showToast(`⏱️ ${nome.split(' ')[0]} está bloqueado por ${dias} dia${dias>1?'s':''}.`);
+btn.textContent='Enviar convite'; btn.disabled=false;
+return;
+}
 // Verifica se já existe convite ou contratação para este profissional nesta vaga
 const { data: jaExiste } = await sb.from('contratacoes')
 .select('id, status')
