@@ -973,6 +973,8 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="scroll-content">
 <div id="cand-header-bar" style="padding:10px 20px;background:var(--sky);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500">
 </div>
+<div id="btn-convidar-profissional-div" style="padding:16px 20px;border-bottom:1px solid var(--border)">
+</div>
 <div id="cand-list">
 </div>
 </div>
@@ -2756,6 +2758,54 @@ CANDIDATOS.push({nome:p.nome, profissional_id:c.profissional_id, funcoes:p.funco
 }
 renderCandidatos();
 }
+async function abrirBuscaProfissionaisConvite(vagaId){
+const vagaInfo = VAGAS[vagaId] || VAGAS_LIST.find(v => v.id === vagaId);
+if(!vagaInfo) { showToast('Vaga não encontrada'); return; }
+// Busca TODOS os profissionais do banco
+const { data: todosProfs } = await sb.from('profissionais').select('id, nome, usuario_id, funcoes, bloqueado_ate, banido').order('nome');
+// Filtra já contratados e bloqueados
+const profissionaisDisponiveis = (todosProfs || []).filter(p => {
+const estaBloqueado = p.bloqueado_ate && new Date(p.bloqueado_ate) > new Date();
+const temFuncao = p.funcoes && p.funcoes.includes(vagaInfo.fn || 'Garçom');
+return !p.banido && !estaBloqueado && temFuncao;
+});
+// Modal HTML
+const modal = document.createElement('div');
+modal.className = 'modal-overlay';
+modal.id = 'modal-busca-convite';
+modal.innerHTML = `
+<div class="modal" style="width:90%;max-width:500px">
+<div class="modal-header">
+<div class="modal-title">Convidar profissional para ${vagaInfo.fn || 'Garçom'}</div>
+<button class="modal-close" onclick="closeModal('modal-busca-convite')">&times;</button>
+</div>
+<div class="modal-content" style="max-height:400px;overflow-y:auto">
+<input type="text" id="busca-prof-input" placeholder="Buscar por nome..." style="width:100%;padding:8px;margin-bottom:12px;border:1px solid var(--border);border-radius:4px">
+<div id="lista-prof-convite" style="display:flex;flex-direction:column;gap:8px">
+${profissionaisDisponiveis.map(p => `
+<div style="padding:12px;border:1px solid var(--border);border-radius:6px;display:flex;justify-content:space-between;align-items:center">
+<div>
+<div style="font-weight:600;font-size:14px">${p.nome}</div>
+<div style="font-size:12px;color:var(--gray)">${(p.funcoes || []).join(', ') || 'Sem funções'}</div>
+</div>
+<button class="btn btn-primary btn-sm" onclick="enviarConviteEmp('${p.nome}', '${p.id}', '${vagaId}')">Convidar</button>
+</div>
+`).join('')}
+</div>
+</div>
+</div>
+`;
+document.body.appendChild(modal);
+modal.onclick = (e) => { if(e.target === modal) closeModal('modal-busca-convite'); };
+// Filtro de busca
+document.getElementById('busca-prof-input')?.addEventListener('keyup', (e) => {
+const termo = e.target.value.toLowerCase();
+document.querySelectorAll('#lista-prof-convite > div').forEach(card => {
+const nome = card.querySelector('div:first-child > div:first-child').textContent.toLowerCase();
+card.style.display = nome.includes(termo) ? '' : 'none';
+});
+});
+}
 function renderCandidatos(){
 const list = document.getElementById('cand-list');
 if(!list) return;
@@ -2764,6 +2814,11 @@ if(!v){
 const list2 = document.getElementById('cand-list');
 if(list2) list2.innerHTML = '<div style="padding:32px;text-align:center;color:var(--gray);font-size:13px">Nenhuma vaga selecionada.</div>';
 return;
+}
+// Adiciona botão para convidar profissional não candidato
+const btnConvidarDiv = document.getElementById('btn-convidar-profissional-div');
+if(btnConvidarDiv){
+btnConvidarDiv.innerHTML = `<button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:16px" onclick="abrirBuscaProfissionaisConvite('${vagaCandidatosAtiva}')">+ Convidar profissional</button>`;
 }
 const enc = vagaEncerrada(v);
 const rest = vagasRestantes(v);
