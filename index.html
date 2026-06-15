@@ -3902,6 +3902,10 @@ PROF.fns = novasFns;
 try {
 if(CURRENT_USER && novoNome){
 await sb.auth.updateUser({ data: { nome: novoNome } });
+// Também atualiza a coluna nome em profissionais para o ranking sincronizar
+if(CURRENT_PROFILE?.id){
+await sb.from('profissionais').update({ nome: novoNome }).eq('id', CURRENT_PROFILE.id);
+}
 }
 if(CURRENT_PROFILE?.id){
 await sb.from('profissionais').update({ funcoes: novasFns }).eq('id', CURRENT_PROFILE.id);
@@ -3913,6 +3917,7 @@ await carregarRankingBanco();
 // Atualiza UI
 const el = id => document.getElementById(id);
 if(novoNome){
+CURRENT_PROFILE.nome = novoNome; // Sincroniza local
 if(el('home-nome'))   el('home-nome').textContent = novoNome;
 if(el('perfil-nome')) el('perfil-nome').textContent = novoNome;
 document.querySelectorAll('.avatar-btn').forEach(b => b.textContent = novoNome[0]?.toUpperCase()||'?');
@@ -5021,6 +5026,14 @@ countdownHTML = `
 // Inicia contagem regressiva
 const alvo = emAndamento ? proximoEvento._fim : proximoEvento._inicio;
 function atualizarContagem(){
+// Revalida: se o evento mudou de status ou foi encerrado, para
+const eventoAtualizado = CONTRATACOES_PROF.find(c => c.id === proximoEvento.id);
+if(!eventoAtualizado || eventoAtualizado.status !== 'confirmado'){
+clearInterval(_countdownInterval);
+_countdownInterval = null;
+renderContratacoesProfHome();
+return;
+}
 const diff = alvo - new Date();
 if(diff <= 0){
 clearInterval(_countdownInterval);
