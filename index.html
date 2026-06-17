@@ -1162,8 +1162,18 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 <div class="form-section-title">Evento</div>
 <div style="margin-bottom:12px">
+<span class="inp-label">Evento</span>
+<select class="inp" id="nova-vaga-evento" onchange="toggleNovoEventoCampo()">
+<option value="__novo__">+ Novo evento</option>
+</select>
+</div>
+<div style="margin-bottom:12px" id="nova-vaga-evento-novo-wrap">
+<span class="inp-label">Nome do novo evento</span>
+<input class="inp" id="nova-vaga-evento-novo" placeholder="Ex: Casamento Silva"/>
+</div>
+<div style="margin-bottom:12px">
 <span class="inp-label">Título da vaga</span>
-<input class="inp" placeholder="Ex: Garçom – Casamento"/>
+<input class="inp" id="nova-vaga-titulo" placeholder="Ex: Garçom – Casamento"/>
 </div>
 <div class="form-row" style="margin-bottom:12px">
 <div>
@@ -2481,6 +2491,16 @@ renderEmpVagasHome();
 renderEmpVagasList();
 }
 // ─── PUBLICAR VAGA NO BANCO ───────────────────────────
+async function criarEventoBanco(nome, local){
+if(!CURRENT_PROFILE?.id) return null;
+try {
+const { data, error } = await sb.from('eventos')
+.insert({ empresa_id: CURRENT_PROFILE.id, nome: nome || 'Evento', local: local || 'Uberlândia' })
+.select('id').single();
+if(error){ console.error('Erro ao criar evento:', error); return null; }
+return data?.id || null;
+} catch(e){ console.warn('criarEvento:', e.message); return null; }
+}
 async function publicarVagaBanco(dadosVaga){
 if(!CURRENT_PROFILE?.id) return null;
 const { data, error } = await sb.from('vagas').insert({
@@ -2492,6 +2512,7 @@ hora_termino: dadosVaga.horaTerminoISO || new Date().toISOString(),
 valor:       dadosVaga.valorNum || 0,
 total_vagas: dadosVaga.totalVagas || 1,
 local:       dadosVaga.local || 'Uberlândia',
+evento_id:   dadosVaga.eventoId || null,
 status:      'ativa',
 }).select().single();
 if(error){ console.error('Erro ao publicar vaga:', error); return null; }
@@ -3109,9 +3130,9 @@ showToast('Candidatura cancelada.');
 async function publicarVaga(){
 const fnChips = document.querySelectorAll('#modal-nova-vaga .chip-group .chip.active');
 const fn = fnChips.length ? fnChips[0].textContent : 'Garçom';
-const tituloEl = document.querySelector('#modal-nova-vaga input.inp');
+const tituloEl = document.getElementById('nova-vaga-titulo');
 const titulo = tituloEl?.value?.trim() || `${fn} – Novo evento`;
-const dataEl = document.querySelectorAll('#modal-nova-vaga input.inp')[1];
+const dataEl = document.getElementById('nova-vaga-data');
 const horaIni = document.querySelectorAll('#modal-nova-vaga input[type=time]')[0]?.value || '18:00';
 const horaFim = document.querySelectorAll('#modal-nova-vaga input[type=time]')[1]?.value || '23:00';
 const nVagas = parseInt(document.querySelector('#modal-nova-vaga input[type=number]')?.value || '1');
@@ -3135,10 +3156,20 @@ const dataISO  = `${dataEl.value}T${horaFim}:00`;
 const inicioISO = `${dataEl.value}T${horaIni}:00`;
 // Salva no Supabase se logado
 let id = 'v_' + Date.now();
+let eventoId = null, eventoNome = null;
 if(CURRENT_USER && CURRENT_PROFILE){
+const eventoSel = document.getElementById('nova-vaga-evento');
+const escolha = eventoSel?.value || '__novo__';
+if(escolha === '__novo__'){
+eventoNome = document.getElementById('nova-vaga-evento-novo')?.value?.trim() || titulo;
+eventoId = await criarEventoBanco(eventoNome, 'Uberlândia');
+} else {
+eventoId = escolha;
+eventoNome = eventoSel?.selectedOptions?.[0]?.textContent || null;
+}
 const vagaBanco = await publicarVagaBanco({
 titulo, fn, totalVagas: nVagas, valorNum: parseFloat(valor)||0,
-dataISO: inicioISO, horaTerminoISO: dataISO, local: 'Uberlândia',
+dataISO: inicioISO, horaTerminoISO: dataISO, local: 'Uberlândia', eventoId,
 });
 if(vagaBanco) id = vagaBanco.id;
 }
@@ -3150,6 +3181,7 @@ data: dataStr, hora:`${horaIni}–${horaFim}`,
 val: valor !== '0' ? `R$ ${valor}` : 'R$ —',
 totalVagas: nVagas, contratados: [], encerradaManual: false,
 dataISO,
+evento_id: eventoId, evento_nome: eventoNome, inicioISO, terminoISO: dataISO,
 _candidatosNomes: new Set(),
 _candidaturaIds: {},
 };
@@ -5541,7 +5573,31 @@ if(inputData){
 inputData.min = hoje;
 if(!inputData.value) inputData.value = hoje;
 }
+carregarEventosNoSelect();
 openModal('modal-nova-vaga');
+}
+async function carregarEventosNoSelect(){
+const sel = document.getElementById('nova-vaga-evento');
+const novoInput = document.getElementById('nova-vaga-evento-novo');
+if(novoInput) novoInput.value = '';
+if(sel) sel.innerHTML = '<option value="__novo__">+ Novo evento</option>';
+toggleNovoEventoCampo();
+if(!sel || !CURRENT_PROFILE?.id) return;
+try {
+const { data } = await sb.from('eventos').select('id, nome, created_at').eq('empresa_id', CURRENT_PROFILE.id);
+(data||[]).slice().sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))
+.forEach(ev=>{
+const opt = document.createElement('option');
+opt.value = ev.id; opt.textContent = ev.nome;
+sel.appendChild(opt);
+});
+} catch(e){ console.warn('carregarEventos:', e.message); }
+}
+function toggleNovoEventoCampo(){
+const sel = document.getElementById('nova-vaga-evento');
+const wrap = document.getElementById('nova-vaga-evento-novo-wrap');
+if(!sel || !wrap) return;
+wrap.style.display = (sel.value === '__novo__') ? '' : 'none';
 }
 // ─── CHECK-IN / PRESENÇA ──────────────────────────────────────
 function abrirCheckin(vagaId, nomeProfissional, profissionalId){
