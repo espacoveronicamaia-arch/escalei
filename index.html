@@ -3152,8 +3152,8 @@ dataEl?.focus();
 return;
 }
 const dataStr  = new Date(dataEl.value+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
-const dataISO  = `${dataEl.value}T${horaFim}:00`;
-const inicioISO = `${dataEl.value}T${horaIni}:00`;
+const dataISO  = new Date(`${dataEl.value}T${horaFim}:00`).toISOString();
+const inicioISO = new Date(`${dataEl.value}T${horaIni}:00`).toISOString();
 // Salva no Supabase se logado
 let id = 'v_' + Date.now();
 let eventoId = null, eventoNome = null;
