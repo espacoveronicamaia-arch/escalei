@@ -3559,31 +3559,24 @@ return { ...cat, nivel };
 function renderEmpVagasHome(){
 const wrap = document.getElementById('emp-vagas-home');
 if(!wrap) return;
-// Home: mostra apenas vagas ATIVAS (futuras ou sem data)
-// Vagas encerradas/passadas ficam só no histórico
 const agora = new Date();
-const vagaIds = Object.keys(VAGAS).filter(id => {
-const v = VAGAS[id];
+const ativas = Object.keys(VAGAS).map(id=>VAGAS[id]).filter(v => {
 if(!v) return false;
-if(vagaEncerrada(v)) return false;          // oculta encerradas
-if(!v.dataISO) return true;                 // sem data = mostra
-const fim = new Date(v.dataISO);
-return fim> agora;                         // só eventos futuros
-}).slice(0, 3);
-if(!vagaIds.length){
+if(vagaEncerrada(v)) return false;
+if(!v.dataISO) return true;
+return new Date(v.dataISO) > agora;
+});
+if(!ativas.length){
 wrap.innerHTML = `<div style="text-align:center;padding:24px 20px;color:var(--gray)">
 <div style="font-size:13px;margin-bottom:10px">Nenhuma vaga ativa no momento</div>
 <button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Publicar nova vaga</button>
 </div>`;
 return;
 }
-wrap.innerHTML = vagaIds.map(id=>{
-const v = VAGAS[id];
-if(!v) return '';
+const renderHomeCard = (v)=>{
 const enc = vagaEncerrada(v);
 const rest = vagasRestantes(v);
 const badge = statusBadge(v);
-const candCount = CANDIDATOS.length - v.contratados.length;
 return `<div class="emp-vaga-card${enc?' vaga-encerrada':''}" onclick="${enc?'':` abrirCandidatos('${v.id}')`}">
 <div class="emp-vaga-top">
 <div class="emp-vaga-titulo">${v.title}</div>
@@ -3613,7 +3606,13 @@ ${enc
 </div>`
 }
 </div>`;
-}).join('');
+};
+const grupos = agruparVagasPorEvento(ativas).slice(0, 3);
+wrap.innerHTML = grupos.map(g =>
+g.funcoes.length === 1
+? renderHomeCard(g.funcoes[0])
+: cabecalhoEvento(g) + g.funcoes.map(renderHomeCard).join('')
+).join('');
 }
 // ─── HISTÓRICO PROFISSIONAL ───────────────────────────
 const HISTORICO_PROF = [];
@@ -4273,6 +4272,15 @@ if(fim && (!g._fim || fim > g._fim)) g._fim = fim;
 });
 return [...grupos.values()].map(g=>({ evento_id: g.evento_id, nome: g.nome, funcoes: g.funcoes, inicio: g._ini, termino: g._fim }));
 }
+function cabecalhoEvento(g){
+const fmtData = g.inicio  ? g.inicio.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}) : '';
+const fmtIni  = g.inicio  ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})  : '';
+const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+return `<div style="margin:4px 0 8px;padding:10px 12px;background:rgba(31,77,58,.06);border-radius:12px">
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${g.nome}</div>
+<div style="font-size:12px;color:var(--gray);margin-top:2px">${fmtData} · ${fmtIni}–${fmtFim} · ${g.funcoes.length} funções</div>
+</div>`;
+}
 function renderEmpVagasList(){
 const wrap = document.getElementById('emp-vagas-list');
 if(!wrap) return;
@@ -4344,15 +4352,6 @@ ${(()=>{ const fim = v.dataISO ? new Date(v.dataISO) : null; return fim && fim> 
 </div>`
 }
 </div><div style="height:12px"></div>`;
-};
-const cabecalhoEvento = (g)=>{
-const fmtData = g.inicio  ? g.inicio.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}) : '';
-const fmtIni  = g.inicio  ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})  : '';
-const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
-return `<div style="margin:4px 0 8px;padding:10px 12px;background:rgba(31,77,58,.06);border-radius:12px">
-<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${g.nome}</div>
-<div style="font-size:12px;color:var(--gray);margin-top:2px">${fmtData} · ${fmtIni}–${fmtFim} · ${g.funcoes.length} funções</div>
-</div>`;
 };
 wrap.innerHTML = agruparVagasPorEvento(filtradas).map(g =>
 g.funcoes.length === 1
