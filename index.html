@@ -1081,13 +1081,6 @@ body{background:#D8E3F5;min-height:100vh}
 <div><div style="font-size:11px;color:var(--gray);margin-bottom:2px">Membro desde</div><div style="font-size:14px;font-weight:500">Janeiro 2026 · Fundadora</div></div>
 </div></div>
 </div>
-<div class="sep"></div>
-<div style="padding:20px 20px 8px">
-<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:4px">Histórico de contratações</div>
-<div style="font-size:12px;color:var(--gray);margin-bottom:0">Vagas publicadas e profissionais contratados</div>
-</div>
-<div id="emp-historico-list"></div>
-<div style="height:8px"></div>
 <!-- Avaliações recebidas -->
 <div style="padding:0 20px">
 <div class="sep"></div>
@@ -1838,7 +1831,7 @@ if(id === 'screen-vagas-emp'){ renderEmpVagasList(); }
 if(id === 'screen-eventos-emp'){ renderEmpEventos(); }
 if(id === 'screen-evento-detalhe'){ renderEventoDetalhe(); }
 if(id === 'screen-home-emp'){ renderEmpVagasHome(); }
-if(id === 'screen-perfil-emp'){ renderEmpHistorico(); carregarAvaliacoesEmpresaPublico(); }
+if(id === 'screen-perfil-emp'){ carregarAvaliacoesEmpresaPublico(); }
 if(id === 'screen-chats'){ renderChatsList(); }
 if(id === 'screen-chat'){ renderMensagens(); }
 if(id === 'screen-historico'){ renderHistorico(); }
