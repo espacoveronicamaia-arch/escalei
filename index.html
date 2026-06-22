@@ -4300,9 +4300,21 @@ return `<div style="margin:4px 0 8px;padding:10px 12px;background:rgba(31,77,58,
 </div>`;
 }
 function faseEvento(g, agora){
-const ini = g.inicio, fim = g.termino;
-if(fim && fim < agora) return 'fin';
-if(ini && ini <= agora && (!fim || fim >= agora)) return 'vivo';
+const fns = (g.funcoes||[]);
+if(!fns.length){
+if(g.termino && g.termino < agora) return 'fin';
+if(g.inicio && g.inicio <= agora && (!g.termino || g.termino >= agora)) return 'vivo';
+return 'prox';
+}
+let live=false, allEnded=true;
+for(const v of fns){
+const ini = v.inicioISO ? new Date(v.inicioISO) : null;
+const fim = v.terminoISO ? new Date(v.terminoISO) : null;
+if(ini && fim && ini <= agora && agora <= fim) live = true;
+if(!(fim && fim < agora)) allEnded = false;
+}
+if(live) return 'vivo';
+if(allEnded) return 'fin';
 return 'prox';
 }
 function renderEmpEventos(){
@@ -4315,30 +4327,25 @@ grupos.forEach(g => buckets[faseEvento(g, agora)].push(g));
 buckets.prox.sort((a,b)=>(a.inicio?a.inicio.getTime():Infinity)-(b.inicio?b.inicio.getTime():Infinity));
 buckets.vivo.sort((a,b)=>(a.inicio?a.inicio.getTime():0)-(b.inicio?b.inicio.getTime():0));
 buckets.fin.sort((a,b)=>(b.termino?b.termino.getTime():0)-(a.termino?a.termino.getTime():0));
-const cardFuncao = (v)=>{
+const chipFuncao = (v)=>{
 const enc = vagaEncerrada(v);
-const rest = vagasRestantes(v);
-const badge = statusBadge(v);
-return `<div class="emp-vaga-card${enc?' vaga-encerrada':''}" style="margin-bottom:0" onclick="${enc?'':` abrirCandidatos('${v.id}')`}">
-<div class="emp-vaga-top">
-<div class="emp-vaga-titulo">${v.title}</div>
-${badge}
-</div>
-<div class="emp-vaga-info">
-<div class="emp-vaga-detail">${v.data||'—'}</div>
-<div class="emp-vaga-detail">${v.hora||'—'}</div>
-<div class="emp-vaga-detail">${v.val||'—'}</div>
-</div>
-<div class="emp-vaga-cands">
-<div class="cands-count">${v.contratados.length}/${v.totalVagas}</div>
-<div class="cands-lbl">contratados · ${rest} restante${rest!==1?'s':''}${enc?'':`<br><span style="color:var(--blue-mid);font-weight:600;font-size:11px">Ver candidatos →</span>`}</div>
-</div>
-</div><div style="height:10px"></div>`;
+const tot = v.totalVagas||0;
+const cont = (v.contratados||[]).length;
+const cheio = tot>0 && cont>=tot;
+const cor = enc ? 'var(--gray)' : ((cont>0||cheio) ? 'var(--green)' : 'var(--accent)');
+const fn = v.fn || v.title || 'Função';
+return `<div onclick="abrirCandidatos('${v.id}')" style="display:flex;align-items:center;gap:9px;padding:9px 13px;background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">
+<span style="width:7px;height:7px;border-radius:50%;background:${cor};flex-shrink:0"></span>
+<span style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fn}</span>
+<span style="font-size:11px;color:var(--gray);white-space:nowrap">${v.hora||''}</span>
+<span style="margin-left:auto;font-weight:700;font-size:13px;color:${cor};white-space:nowrap">${cont}/${tot}</span>
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+</div>`;
 };
-const renderEvento = (g)=> cabecalhoEvento(g) + g.funcoes.map(cardFuncao).join('') + '<div style="height:8px"></div>';
+const renderEvento = (g)=> `<div style="margin-bottom:10px">${cabecalhoEvento(g)}${g.funcoes.map(chipFuncao).join('')}</div>`;
 const secao = (titulo, lista, cor)=>{
 if(!lista.length) return '';
-return `<div style="margin:18px 0 6px;display:flex;align-items:center;gap:7px">
+return `<div style="margin:18px 0 8px;display:flex;align-items:center;gap:7px">
 <span style="width:8px;height:8px;border-radius:50%;background:${cor}"></span>
 <span style="font-family:'Sora',sans-serif;font-weight:700;font-size:13px">${titulo}</span>
 <span style="font-size:11px;color:var(--gray)">· ${lista.length}</span>
@@ -5133,7 +5140,8 @@ const lista = document.getElementById('lista-contratacoes-prof');
 if(!secao || !lista) return;
 if(!CONTRATACOES_PROF.length){ secao.style.display = 'none'; return; }
 secao.style.display = 'block';
-const nConvites = CONTRATACOES_PROF.filter(c=>c.status==='convite').length;
+const conviteExpirado = (c)=> c.status==='convite' && c.vagaDetalhes?.hora_termino && new Date(c.vagaDetalhes.hora_termino) < new Date();
+const nConvites = CONTRATACOES_PROF.filter(c=>c.status==='convite' && !conviteExpirado(c)).length;
 const tituloEl = document.getElementById('titulo-secao-contratacoes');
 if(tituloEl) tituloEl.textContent = nConvites> 0 ? `📩 Minhas contratações (${nConvites} convite${nConvites>1?'s':''} pendente${nConvites>1?'s':''})` : '✅ Minhas contratações';
 // ── Card de próximo evento com contagem regressiva ──────────
@@ -5205,12 +5213,12 @@ if(countdownEl) countdownEl.innerHTML = countdownHTML;
 // Separar futuras (ativas) e passadas (realizadas)
 const agora2 = new Date();
 const futuras  = CONTRATACOES_PROF.filter(c => {
-if(c.status === 'convite') return true;
+if(c.status === 'convite') return !conviteExpirado(c);
 const fim = c.vagaDetalhes?.hora_termino ? new Date(c.vagaDetalhes.hora_termino) : null;
 return !fim || fim> agora2;
 });
 const passadas = CONTRATACOES_PROF.filter(c => {
-if(c.status === 'convite') return false;
+if(c.status === 'convite') return conviteExpirado(c);
 const fim = c.vagaDetalhes?.hora_termino ? new Date(c.vagaDetalhes.hora_termino) : null;
 return fim && fim <= agora2;
 });
@@ -5227,7 +5235,7 @@ const isConvite = c.status === 'convite';
 const fimCard = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const passouCard = fimCard && new Date()> fimCard;
 return `
-<div class="card" style="margin-bottom:12px;border-left:3px solid ${isConvite?'var(--blue)':passouCard?'var(--border)':'var(--green)'};${passouCard?'opacity:.75':''}">
+<div class="card" style="margin-bottom:12px;border-left:3px solid ${passouCard?'var(--border)':(isConvite?'var(--blue)':'var(--green)')};${passouCard?'opacity:.75':''}">
 <div class="card-pad">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
 <div>
@@ -5235,7 +5243,9 @@ return `
 <div style="font-size:12px;color:var(--gray);margin-top:2px">${data} · ${hora} · ${val}</div>
 </div>
 ${isConvite
-? `<span style="background:rgba(37,99,235,.1);color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;white-space:nowrap">Convite</span>`
+? (passouCard
+? `<span style="background:rgba(107,114,128,.12);color:var(--gray);font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;white-space:nowrap">Convite expirado</span>`
+: `<span style="background:rgba(37,99,235,.1);color:var(--blue);font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;white-space:nowrap">Convite</span>`)
 : (() => {
 const fimBadge = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const passouBadge = fimBadge && new Date()> fimBadge;
@@ -5245,11 +5255,13 @@ return passouBadge
 })()
 }
 </div>
-${isConvite ? `
+${isConvite ? (passouCard
+? `<div style="margin-top:10px;font-size:11px;color:var(--gray);text-align:center;padding:7px;background:rgba(107,114,128,.06);border-radius:8px">Convite expirado · você não respondeu a tempo</div>`
+: `
 <div style="display:flex;gap:8px;margin-top:10px">
 <button class="btn btn-primary btn-sm" style="flex:1;font-size:12px" onclick="aceitarConvite('${c.id}')">✓ Aceitar</button>
 <button class="btn btn-ghost btn-sm" style="flex:1;font-size:12px;border:1.5px solid var(--border)" onclick="recusarConvite('${c.id}')">Recusar</button>
-</div>` : (() => {
+</div>`) : (() => {
 // Esconde botao Desistir se o evento ja terminou
 const fimEvento = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const eventoPassou = fimEvento && new Date() > fimEvento;
