@@ -943,7 +943,7 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="topbar">
 <button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
 <div class="sec-title" style="font-size:17px">Eventos</div>
-<button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Nova</button>
+<button class="btn btn-primary btn-sm" onclick="abrirModalNovoEvento()">+ Novo evento</button>
 </div>
 <div class="scroll-content">
 <div id="emp-eventos-list" style="padding:8px 20px 24px">
@@ -979,7 +979,7 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="topbar">
 <button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
 <div class="sec-title" style="font-size:17px">Minhas vagas</div>
-<button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Nova</button>
+<button class="btn btn-primary btn-sm" onclick="abrirModalNovoEvento()">+ Novo evento</button>
 </div>
 <div class="scroll-content">
 <div class="filter-bar" id="vagas-emp-filter-bar">
@@ -3603,7 +3603,7 @@ return new Date(v.dataISO) > agora;
 if(!ativas.length){
 wrap.innerHTML = `<div style="text-align:center;padding:24px 20px;color:var(--gray)">
 <div style="font-size:13px;margin-bottom:10px">Nenhuma vaga ativa no momento</div>
-<button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Publicar nova vaga</button>
+<button class="btn btn-primary btn-sm" onclick="abrirModalNovoEvento()">+ Novo evento</button>
 </div>`;
 return;
 }
@@ -4374,7 +4374,7 @@ secao('Finalizados', buckets.fin, 'var(--gray)')
 ].join('');
 wrap.innerHTML = html || `<div class="empty-state" style="padding:32px 20px;text-align:center;color:var(--gray)">
 <div class="empty-title" style="font-size:14px;margin-bottom:10px">Nenhum evento ainda</div>
-<button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Nova vaga</button>
+<button class="btn btn-primary btn-sm" onclick="abrirModalNovoEvento()">+ Novo evento</button>
 </div>`;
 }
 let EVENTO_ATIVO = null;
@@ -4513,6 +4513,143 @@ tick();
 _evdInterval = setInterval(tick, 1000);
 }
 }
+let _novoEventoFuncoes = [];
+function toggleChipFuncao(el){
+const group = el.parentElement;
+if(!group) return;
+group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+el.classList.add('active');
+}
+function abrirModalNovoEvento(){
+_novoEventoFuncoes = [];
+const hoje = new Date().toISOString().split('T')[0];
+const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+const setAttr = (id, attr, val) => { const el = document.getElementById(id); if(el) el[attr] = val; };
+set('ne-nome', '');
+setAttr('ne-data', 'min', hoje);
+set('ne-data', hoje);
+set('ne-local', 'Uberlândia');
+set('ne-hora-ini', '18:00');
+set('ne-hora-fim', '23:00');
+cancelarAdicaoFuncao();
+renderListaFuncoesEvento();
+atualizarAvisosEvento();
+openModal('modal-novo-evento');
+}
+function renderListaFuncoesEvento(){
+const wrap = document.getElementById('ne-funcoes-lista');
+const cnt = document.getElementById('ne-fn-count');
+if(!wrap) return;
+const n = _novoEventoFuncoes.length;
+if(cnt) cnt.textContent = `${n} ${n===1?'função':'funções'}`;
+if(!n){
+wrap.innerHTML = `<div style="padding:14px;text-align:center;color:var(--gray);font-size:12px;font-style:italic;border:1px dashed var(--border);border-radius:10px">Nenhuma função adicionada</div>`;
+return;
+}
+wrap.innerHTML = _novoEventoFuncoes.map((f, i) =>
+`<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+<div style="flex:1;min-width:0">
+<div style="font-weight:700;font-size:13px">${f.qtd}x ${f.fn}</div>
+<div style="font-size:11px;color:var(--gray)">R$ ${f.valor} · ${f.horaIni}–${f.horaFim}</div>
+</div>
+<button class="icon-btn" onclick="removerFuncaoEvento(${i})" style="color:var(--red)" title="Remover">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+</button>
+</div>`
+).join('');
+}
+function abrirAdicaoFuncao(){
+const form = document.getElementById('ne-add-form');
+const btn = document.getElementById('ne-btn-add');
+if(!form) return;
+const ini = document.getElementById('ne-hora-ini')?.value || '18:00';
+const fim = document.getElementById('ne-hora-fim')?.value || '23:00';
+const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+set('ne-fn-ini', ini);
+set('ne-fn-fim', fim);
+set('ne-fn-qtd', '1');
+set('ne-fn-valor', '');
+document.querySelectorAll('#ne-fn-chips .chip').forEach((c,i) => c.classList.toggle('active', i === 0));
+form.style.display = 'block';
+if(btn) btn.style.display = 'none';
+}
+function cancelarAdicaoFuncao(){
+const form = document.getElementById('ne-add-form');
+const btn = document.getElementById('ne-btn-add');
+if(form) form.style.display = 'none';
+if(btn) btn.style.display = 'block';
+}
+function adicionarFuncaoEvento(){
+const chipAtivo = document.querySelector('#ne-fn-chips .chip.active');
+const fn = chipAtivo ? chipAtivo.textContent.trim() : 'Garçom';
+const qtd = parseInt(document.getElementById('ne-fn-qtd')?.value || '1');
+const valor = parseFloat(document.getElementById('ne-fn-valor')?.value || '0');
+const horaIni = document.getElementById('ne-fn-ini')?.value || '18:00';
+const horaFim = document.getElementById('ne-fn-fim')?.value || '23:00';
+if(qtd < 1){ showToast('Quantidade mínima é 1'); return; }
+if(valor <= 0){ showToast('Informe o valor por profissional'); return; }
+if(horaIni >= horaFim){ showToast('Início deve ser antes do término'); return; }
+_novoEventoFuncoes.push({ fn, qtd, valor, horaIni, horaFim });
+cancelarAdicaoFuncao();
+renderListaFuncoesEvento();
+atualizarAvisosEvento();
+}
+function removerFuncaoEvento(idx){
+_novoEventoFuncoes.splice(idx, 1);
+renderListaFuncoesEvento();
+atualizarAvisosEvento();
+}
+function atualizarAvisosEvento(){
+const wrap = document.getElementById('ne-warning');
+if(!wrap) return;
+const ini = document.getElementById('ne-hora-ini')?.value;
+const fim = document.getElementById('ne-hora-fim')?.value;
+if(!ini || !fim || !_novoEventoFuncoes.length){ wrap.style.display = 'none'; return; }
+const fora = _novoEventoFuncoes.filter(f => f.horaIni < ini || f.horaFim > fim);
+if(!fora.length){ wrap.style.display = 'none'; return; }
+wrap.style.display = 'block';
+wrap.innerHTML = `⚠️ ${fora.length} ${fora.length===1?'função está':'funções estão'} fora da janela do evento (${ini}–${fim}). Você ainda pode publicar, mas confira se está correto.`;
+}
+async function publicarEvento(){
+if(!CURRENT_PROFILE?.id){ showToast('Faça login como empresa'); return; }
+const nome = document.getElementById('ne-nome')?.value?.trim();
+const dataVal = document.getElementById('ne-data')?.value;
+const horaIni = document.getElementById('ne-hora-ini')?.value;
+const horaFim = document.getElementById('ne-hora-fim')?.value;
+const local = document.getElementById('ne-local')?.value?.trim() || 'Uberlândia';
+if(!nome){ showToast('Informe o nome do evento'); document.getElementById('ne-nome')?.focus(); return; }
+if(!dataVal){ showToast('Informe a data do evento'); document.getElementById('ne-data')?.focus(); return; }
+const dataSel = new Date(dataVal + 'T00:00');
+const hoje = new Date(); hoje.setHours(0,0,0,0);
+if(dataSel < hoje){ showToast('A data não pode ser no passado'); return; }
+if(horaIni >= horaFim){ showToast('Início deve ser antes do término'); return; }
+if(!_novoEventoFuncoes.length){ showToast('Adicione pelo menos uma função'); return; }
+const btn = document.getElementById('ne-btn-publicar');
+if(btn){ btn.disabled = true; btn.textContent = 'Publicando...'; }
+try {
+const eventoId = await criarEventoBanco(nome, local);
+if(!eventoId){ showToast('Erro ao criar evento. Tente novamente.'); return; }
+let okCount = 0;
+for(const f of _novoEventoFuncoes){
+const dataISOIni = new Date(`${dataVal}T${f.horaIni}:00`).toISOString();
+const dataISOFim = new Date(`${dataVal}T${f.horaFim}:00`).toISOString();
+const result = await publicarVagaBanco({
+titulo: f.fn, fn: f.fn,
+totalVagas: f.qtd, valorNum: f.valor,
+dataISO: dataISOIni, horaTerminoISO: dataISOFim,
+local, eventoId,
+});
+if(result) okCount++;
+}
+closeModal('modal-novo-evento');
+showToast(`Evento "${nome}" publicado! (${okCount} ${okCount===1?'função':'funções'})`);
+await carregarVagasEmpresaBanco();
+if(typeof renderEmpEventos === 'function') renderEmpEventos();
+if(typeof renderEmpVagasHome === 'function') renderEmpVagasHome();
+} finally {
+if(btn){ btn.disabled = false; btn.textContent = 'Publicar evento'; }
+}
+}
 function classificarPresencaSaiu(contId, vagaId, profId){
 _classCtx = { contId, vagaId, profId };
 openModal('modal-saiu-antes');
@@ -4570,7 +4707,7 @@ wrap.innerHTML = `<div class="empty-state">
 <div style="font-size:13px;color:var(--gray);margin-bottom:16px">
 ${empVagaFiltro==='Ativas'?'Publique uma nova vaga para começar':''}
 </div>
-${empVagaFiltro==='Ativas'?`<button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Nova vaga</button>`:''}
+${empVagaFiltro==='Ativas'?`<button class="btn btn-primary btn-sm" onclick="abrirModalNovoEvento()">+ Novo evento</button>`:''}
 </div>`;
 return;
 }
@@ -6457,6 +6594,88 @@ async function enviarAvaliacaoEmpresa(){
 </div>
 
 
+<div class="modal-overlay" id="modal-novo-evento">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Novo Evento</div>
+<button class="modal-close" onclick="closeModal('modal-novo-evento')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div class="form-section-title">Dados do evento</div>
+<div style="margin-bottom:12px">
+<span class="inp-label">Nome do evento *</span>
+<input class="inp" id="ne-nome" placeholder="Ex: Casamento Júlia & Pedro" />
+</div>
+<div class="form-row" style="margin-bottom:12px">
+<div>
+<span class="inp-label">Data *</span>
+<input class="inp" type="date" id="ne-data" min="" />
+</div>
+<div>
+<span class="inp-label">Local</span>
+<input class="inp" id="ne-local" placeholder="Salão XPTO" value="Uberlândia" />
+</div>
+</div>
+<div class="form-row" style="margin-bottom:8px">
+<div>
+<span class="inp-label">Início *</span>
+<input class="inp" type="time" id="ne-hora-ini" value="18:00" onchange="atualizarAvisosEvento()" />
+</div>
+<div>
+<span class="inp-label">Término *</span>
+<input class="inp" type="time" id="ne-hora-fim" value="23:00" onchange="atualizarAvisosEvento()" />
+</div>
+</div>
+<div style="font-size:11px;color:var(--gray);margin-bottom:18px">Janela do evento. Cada função pode ter horário próprio dentro disso.</div>
+<div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between">
+<span>Funções</span>
+<span style="font-size:11px;font-weight:400;color:var(--gray)" id="ne-fn-count">0 funções</span>
+</div>
+<div id="ne-funcoes-lista" style="margin-bottom:10px"></div>
+<div id="ne-add-form" style="display:none;background:rgba(31,77,58,.04);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+<div style="font-weight:700;font-size:13px;margin-bottom:10px">Adicionar função</div>
+<div class="chip-group" id="ne-fn-chips" style="margin-bottom:10px">
+<button class="chip active" type="button" onclick="toggleChipFuncao(this)">Garçom</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Bartender</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Cumim</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Aux. Cozinha</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Aux. Limpeza</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Recepcionista</button>
+</div>
+<div class="form-row" style="margin-bottom:10px">
+<div>
+<span class="inp-label">Quantidade *</span>
+<input class="inp" type="number" id="ne-fn-qtd" value="1" min="1" />
+</div>
+<div>
+<span class="inp-label">Valor por pessoa (R$) *</span>
+<input class="inp" type="number" id="ne-fn-valor" placeholder="100" />
+</div>
+</div>
+<div class="form-row" style="margin-bottom:6px">
+<div>
+<span class="inp-label">Início da função</span>
+<input class="inp" type="time" id="ne-fn-ini" />
+</div>
+<div>
+<span class="inp-label">Término da função</span>
+<input class="inp" type="time" id="ne-fn-fim" />
+</div>
+</div>
+<div style="font-size:11px;color:var(--gray);margin-bottom:12px">Pode ser diferente do horário geral do evento.</div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-primary btn-sm" style="flex:1" onclick="adicionarFuncaoEvento()">Adicionar</button>
+<button class="btn btn-ghost btn-sm" style="flex:1;border:1px solid var(--border)" onclick="cancelarAdicaoFuncao()">Cancelar</button>
+</div>
+</div>
+<button class="btn btn-ghost btn-block" id="ne-btn-add" style="margin-bottom:14px;border:1.5px dashed var(--border);font-size:13px" onclick="abrirAdicaoFuncao()">+ Adicionar função</button>
+<div id="ne-warning" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.5"></div>
+<button class="btn btn-primary btn-block" id="ne-btn-publicar" style="margin-bottom:12px" onclick="publicarEvento()">Publicar evento</button>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-novo-evento')">Cancelar</button>
+</div>
+</div>
+</div>
 <div class="modal-overlay" id="modal-saiu-antes">
 <div class="modal">
 <div class="modal-handle"></div>
