@@ -2368,9 +2368,10 @@ const { data: todasCands } = await sb.from('candidaturas')
 const candsRaw = (todasCands||[]).filter(c => c.status !== 'desistiu');
 // Contratacoes desta empresa (filtro no servidor)
 const { data: todasConts } = await sb.from('contratacoes')
-.select('id, status, profissional_id, vaga_id')
+.select('id, status, profissional_id, vaga_id, presenca')
 .in('vaga_id', vagaIds);
 const contsConfirmadas = (todasConts||[]).filter(c => c.status === 'confirmado');
+(todasConts||[]).forEach(c=>{ if(c.presenca) PRESENCAS_EMP[c.vaga_id+'_'+c.profissional_id]=c.presenca; });
 const contsConvites    = (todasConts||[]).filter(c => c.status === 'convite');
 // Busca só os profissionais envolvidos (não todos)
 const profIds = [...new Set([
@@ -4534,7 +4535,7 @@ p_vaga_id: vagaId, p_profissional_id: profId, p_estado: estado, p_lat: null, p_l
 });
 if(error){ showToast('Erro: ' + (error.message||'tente novamente')); return; }
 const c = EVENTO_ATIVO?.contratacoes?.find(x => x.id === contId);
-if(c) c.presenca = estado;
+if(c){ c.presenca = estado; PRESENCAS_EMP[vagaId+'_'+profId] = estado; }
 if(currentScreen === 'screen-evento-detalhe') renderEventoDetalhe();
 const msg = {
 presente: '✓ Compareceu registrado',
@@ -4658,6 +4659,7 @@ return { bloqueado:true, banido:false, dias };
 return { bloqueado:false };
 }
 const FALTAS = {}; // { 'vagaId_nome': { registradoPor, data } } — cache em memória
+const PRESENCAS_EMP = {}; // { 'vagaId_profId': estado } — presença por contratação
 async function registrarFalta(vagaId, nomeProfissional, registradoPor, profissionalIdOverride=null){
 const key = `${vagaId}_${nomeProfissional}`;
 // ── ESTADO LOCAL (imediato) ───────────────────────────
@@ -4835,7 +4837,11 @@ return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;borde
 ${(() => {
 const contId = v._contratacaoIdByProf?.[c?.profissional_id];
 const jaAvaliou = contId && AVALIACOES_EMP_FEITAS.has(contId);
-if(faltou) return `<span class="badge badge-red" style="font-size:10px">Nao compareceu</span>`;
+const presencaCache = PRESENCAS_EMP[v.id+'_'+(c?.profissional_id||'')] || null;
+const labelPresenca = { presente:'✓ Compareceu', saiu_autorizado:'↩ Saiu (autorizado)', saiu_desleixo:'⚠ Saiu sem autorização', faltou:'✗ Não compareceu' };
+const corPresenca = { presente:'var(--green)', saiu_autorizado:'#6B7280', saiu_desleixo:'var(--red)', faltou:'var(--red)' };
+if(presencaCache) return `<span class="badge" style="background:${corPresenca[presencaCache]||'var(--gray)'};color:#fff;font-size:10px">${labelPresenca[presencaCache]||presencaCache}</span>`;
+if(faltou) return `<span class="badge badge-red" style="font-size:10px">Não compareceu</span>`;
 if(vagaNoJaneladeAvaliacao(v) && !jaAvaliou) return `<div style="display:flex;align-items:center;gap:6px">
 <button class="btn btn-primary btn-sm" style="padding:4px 8px;font-size:10px"
 onclick="event.stopPropagation();abrirModalAvaliar('${v.id}','${contId||''}','profissional','${c?.profissional_id||''}')">
