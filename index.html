@@ -956,6 +956,25 @@ body{background:#D8E3F5;min-height:100vh}
 <button class="nav-item" onclick="goTo('screen-perfil-emp')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>Empresa</button>
 </div>
 </div>
+<div class="screen" id="screen-evento-detalhe">
+<div class="topbar">
+<button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+<div>
+<div class="sec-title" id="evd-title" style="font-size:16px">Evento</div>
+<div id="evd-subtitle" style="font-size:11px;color:var(--gray)"></div>
+</div>
+<span class="badge" id="evd-fase-badge" style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:99px"></span>
+</div>
+<div class="scroll-content">
+<div id="evd-body" style="padding:14px 20px 32px"></div>
+</div>
+<div class="bottom-nav">
+<button class="nav-item" onclick="goTo('screen-home-emp')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>Início</button>
+<button class="nav-item active" onclick="goTo('screen-eventos-emp')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>Eventos</button>
+<button class="nav-item" onclick="goTo('screen-ranking-emp')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></div>Ranking</button>
+<button class="nav-item" onclick="goTo('screen-perfil-emp')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>Empresa</button>
+</div>
+</div>
 <div class="screen" id="screen-vagas-emp">
 <div class="topbar">
 <button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -1817,6 +1836,7 @@ if(id === 'screen-vagas') renderVagasList();
 if(id === 'screen-home-prof'){ renderHomeVagas(); renderContratacoesProfHome(); }
 if(id === 'screen-vagas-emp'){ renderEmpVagasList(); }
 if(id === 'screen-eventos-emp'){ renderEmpEventos(); }
+if(id === 'screen-evento-detalhe'){ renderEventoDetalhe(); }
 if(id === 'screen-home-emp'){ renderEmpVagasHome(); }
 if(id === 'screen-perfil-emp'){ renderEmpHistorico(); carregarAvaliacoesEmpresaPublico(); }
 if(id === 'screen-chats'){ renderChatsList(); }
@@ -4344,7 +4364,7 @@ return `<div onclick="abrirCandidatos('${v.id}')" style="display:flex;align-item
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
 </div>`;
 };
-const renderEvento = (g)=> `<div style="margin-bottom:10px">${cabecalhoEvento(g)}${g.funcoes.map(chipFuncao).join('')}</div>`;
+const renderEvento = (g)=> `<div style="margin-bottom:10px"><div onclick="abrirEvento('${g.evento_id||('solo:'+g.funcoes[0].id)}')" style="cursor:pointer">${cabecalhoEvento(g)}</div>${g.funcoes.map(chipFuncao).join('')}</div>`;
 const secao = (titulo, lista, cor)=>{
 if(!lista.length) return '';
 return `<div style="margin:18px 0 8px;display:flex;align-items:center;gap:7px">
@@ -4362,6 +4382,102 @@ wrap.innerHTML = html || `<div class="empty-state" style="padding:32px 20px;text
 <div class="empty-title" style="font-size:14px;margin-bottom:10px">Nenhum evento ainda</div>
 <button class="btn btn-primary btn-sm" onclick="abrirModalNovaVaga()">+ Nova vaga</button>
 </div>`;
+}
+let EVENTO_ATIVO = null;
+let _evdInterval = null;
+function abrirEvento(evento_id){
+const grupos = agruparVagasPorEvento(Object.values(VAGAS).filter(Boolean));
+const g = grupos.find(x => (x.evento_id||('solo:'+x.funcoes[0]?.id)) === evento_id) || grupos.find(x => x.evento_id === evento_id);
+if(!g){ showToast('Evento não encontrado'); return; }
+EVENTO_ATIVO = g;
+goTo('screen-evento-detalhe');
+}
+function renderEventoDetalhe(){
+if(_evdInterval){ clearInterval(_evdInterval); _evdInterval = null; }
+const g = EVENTO_ATIVO;
+const body = document.getElementById('evd-body');
+const titleEl = document.getElementById('evd-title');
+const subEl = document.getElementById('evd-subtitle');
+const badgeEl = document.getElementById('evd-fase-badge');
+if(!g || !body){ if(body) body.innerHTML = '<div style="text-align:center;color:var(--gray);padding:30px 0">Evento não disponível.</div>'; return; }
+const agora = new Date();
+const fase = faseEvento(g, agora);
+titleEl.textContent = g.nome || 'Evento';
+const fmtData = g.inicio ? g.inicio.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}) : '';
+const fmtIni  = g.inicio ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+subEl.textContent = `${fmtData} · ${fmtIni}${fmtFim?'–'+fmtFim:''} · ${g.funcoes.length} função${g.funcoes.length!==1?'es':''}`;
+const cores = { vivo:{bg:'rgba(34,197,94,.12)',fg:'var(--green)',label:'AO VIVO'}, prox:{bg:'rgba(37,99,235,.1)',fg:'var(--blue-mid)',label:'PRÓXIMO'}, fin:{bg:'rgba(107,114,128,.12)',fg:'var(--gray)',label:'FINALIZADO'} };
+badgeEl.style.background = cores[fase].bg;
+badgeEl.style.color = cores[fase].fg;
+badgeEl.textContent = cores[fase].label;
+// ── countdown (apenas para 'prox' e 'vivo') ───────────
+let countdownHTML = '';
+if(fase === 'prox' && g.inicio){
+countdownHTML = `<div style="background:linear-gradient(135deg,var(--navy),#1a4060);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px">
+<div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.7;margin-bottom:6px">📅 COMEÇA EM</div>
+<div id="evd-countdown" style="font-family:'Sora',sans-serif;font-weight:700;font-size:26px;letter-spacing:2px">--:--:--</div>
+</div>`;
+} else if(fase === 'vivo'){
+countdownHTML = `<div style="background:linear-gradient(135deg,#059669,#10B981);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px">
+<div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.85;margin-bottom:6px">🟢 EM ANDAMENTO</div>
+<div id="evd-countdown" style="font-family:'Sora',sans-serif;font-weight:700;font-size:22px">Evento acontecendo agora</div>
+<div style="font-size:11px;opacity:.85;margin-top:4px">Em breve: check-in por QR code.</div>
+</div>`;
+}
+// ── lista de funções com contratados ─────────────────
+const renderFuncao = (v) => {
+const tot = v.totalVagas || 0;
+const cont = (v.contratados||[]).length;
+const enc = vagaEncerrada(v);
+const corStatus = enc ? 'var(--gray)' : ((cont>0||cont>=tot) ? 'var(--green)' : 'var(--accent)');
+const fn = v.fn || v.title || 'Função';
+const hora = v.hora || '';
+const lista = (v.contratados||[]);
+const corpoContratados = lista.length
+? lista.map(nome => `
+<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:6px">
+<div class="avatar-btn" style="width:30px;height:30px;font-size:11px;background:linear-gradient(135deg,#3B9EFF,#2563EB);flex-shrink:0">${(nome||'?').slice(0,2).toUpperCase()}</div>
+<div style="flex:1;font-weight:600;font-size:13px">${nome}</div>
+${ fase === 'fin'
+? `<div style="display:flex;gap:4px">
+<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled title="Disponível na próxima fase">Compareceu</button>
+<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled>Saiu antes</button>
+<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled>Faltou</button>
+</div>`
+: '' }
+</div>`).join('')
+: `<div style="padding:10px;color:var(--gray);font-size:12px;font-style:italic;text-align:center">Nenhum contratado ainda</div>`;
+return `<div style="margin-bottom:18px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<span style="width:7px;height:7px;border-radius:50%;background:${corStatus};flex-shrink:0"></span>
+<span style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${fn}</span>
+<span style="font-size:11px;color:var(--gray)">· ${hora}</span>
+<span style="margin-left:auto;font-weight:700;font-size:13px;color:${corStatus}">${cont}/${tot}</span>
+</div>
+${corpoContratados}
+${ !enc && fase !== 'fin' ? `<button class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%;font-size:11px;border:1px solid var(--border)" onclick="abrirCandidatos('${v.id}')">Ver candidatos →</button>` : '' }
+</div>`;
+};
+const dica = fase === 'fin'
+? `<div style="margin-top:6px;padding:10px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;font-size:11px;color:#92400e">⚙ Classificação de presença (Compareceu / Saiu antes / Faltou) será habilitada na próxima entrega.</div>`
+: '';
+body.innerHTML = countdownHTML + g.funcoes.map(renderFuncao).join('') + dica;
+// ── tick do countdown ─────────────────────────────────
+if(fase === 'prox' && g.inicio){
+const tick = () => {
+const el = document.getElementById('evd-countdown');
+if(!el){ clearInterval(_evdInterval); _evdInterval = null; return; }
+const diff = g.inicio - new Date();
+if(diff <= 0){ renderEventoDetalhe(); return; } // virou Ao Vivo
+const h = Math.floor(diff/3600000);
+const m = Math.floor((diff%3600000)/60000);
+const s = Math.floor((diff%60000)/1000);
+el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+};
+tick();
+_evdInterval = setInterval(tick, 1000);
+}
 }
 function renderEmpVagasList(){
 const wrap = document.getElementById('emp-vagas-list');
