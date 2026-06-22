@@ -4385,12 +4385,28 @@ wrap.innerHTML = html || `<div class="empty-state" style="padding:32px 20px;text
 }
 let EVENTO_ATIVO = null;
 let _evdInterval = null;
+let _classCtx = null;
 function abrirEvento(evento_id){
 const grupos = agruparVagasPorEvento(Object.values(VAGAS).filter(Boolean));
 const g = grupos.find(x => (x.evento_id||('solo:'+x.funcoes[0]?.id)) === evento_id) || grupos.find(x => x.evento_id === evento_id);
 if(!g){ showToast('Evento não encontrado'); return; }
 EVENTO_ATIVO = g;
+EVENTO_ATIVO.contratacoes = null; // null = carregando
 goTo('screen-evento-detalhe');
+carregarContratacoesEvento();
+}
+async function carregarContratacoesEvento(){
+const myEvento = EVENTO_ATIVO;
+if(!myEvento || !CURRENT_PROFILE){ return; }
+const vagaIds = new Set(myEvento.funcoes.map(v => v.id));
+// Filtra empresa_id para não bater na limitação do .in(uuid[]) — janela é pequena.
+const { data, error } = await sb.from('contratacoes')
+.select('id, vaga_id, profissional_id, presenca, status, profissionais(nome)')
+.eq('empresa_id', CURRENT_PROFILE.id);
+if(error){ console.warn('Erro contratacoes:', error); return; }
+if(EVENTO_ATIVO !== myEvento) return; // usuário navegou enquanto a query estava pendente
+myEvento.contratacoes = (data||[]).filter(c => vagaIds.has(c.vaga_id) && c.status === 'confirmado');
+if(currentScreen === 'screen-evento-detalhe') renderEventoDetalhe();
 }
 function renderEventoDetalhe(){
 if(_evdInterval){ clearInterval(_evdInterval); _evdInterval = null; }
@@ -4411,7 +4427,6 @@ const cores = { vivo:{bg:'rgba(34,197,94,.12)',fg:'var(--green)',label:'AO VIVO'
 badgeEl.style.background = cores[fase].bg;
 badgeEl.style.color = cores[fase].fg;
 badgeEl.textContent = cores[fase].label;
-// ── countdown (apenas para 'prox' e 'vivo') ───────────
 let countdownHTML = '';
 if(fase === 'prox' && g.inicio){
 countdownHTML = `<div style="background:linear-gradient(135deg,var(--navy),#1a4060);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px">
@@ -4425,7 +4440,9 @@ countdownHTML = `<div style="background:linear-gradient(135deg,#059669,#10B981);
 <div style="font-size:11px;opacity:.85;margin-top:4px">Em breve: check-in por QR code.</div>
 </div>`;
 }
-// ── lista de funções com contratados ─────────────────
+const labelByState = { presente:'✓ Compareceu', saiu_autorizado:'↩ Saiu (autorizado)', saiu_desleixo:'⚠ Saiu (sem autorização)', faltou:'✗ Faltou' };
+const colorByState = { presente:'var(--green)', saiu_autorizado:'var(--gray)', saiu_desleixo:'var(--red)', faltou:'var(--red)' };
+const carregando = fase === 'fin' && EVENTO_ATIVO.contratacoes === null;
 const renderFuncao = (v) => {
 const tot = v.totalVagas || 0;
 const cont = (v.contratados||[]).length;
@@ -4433,21 +4450,48 @@ const enc = vagaEncerrada(v);
 const corStatus = enc ? 'var(--gray)' : ((cont>0||cont>=tot) ? 'var(--green)' : 'var(--accent)');
 const fn = v.fn || v.title || 'Função';
 const hora = v.hora || '';
-const lista = (v.contratados||[]);
-const corpoContratados = lista.length
-? lista.map(nome => `
+let listaHTML = '';
+if(fase === 'fin'){
+if(carregando){
+listaHTML = `<div style="padding:10px;color:var(--gray);font-size:12px;text-align:center">Carregando contratados...</div>`;
+} else {
+const conts = (EVENTO_ATIVO.contratacoes||[]).filter(c => c.vaga_id === v.id);
+if(!conts.length){
+listaHTML = `<div style="padding:10px;color:var(--gray);font-size:12px;font-style:italic;text-align:center">Nenhum contratado</div>`;
+} else {
+listaHTML = conts.map(c => {
+const nome = c.profissionais?.nome || '?';
+const cur = c.presenca || null;
+const sel = (est) => cur === est;
+const selSaiu = cur === 'saiu_autorizado' || cur === 'saiu_desleixo';
+const nomeEsc = String(nome).replace(/'/g, "\\'");
+const btn = (label, color, onclickStr, isOn) =>
+`<button onclick="${onclickStr}" style="font-size:10px;padding:5px 8px;border-radius:6px;border:1px solid ${isOn?color:'var(--border)'};background:${isOn?color:'#fff'};color:${isOn?'#fff':'#374151'};cursor:pointer;font-weight:600;white-space:nowrap">${label}</button>`;
+return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;flex-wrap:wrap">
+<div class="avatar-btn" style="width:30px;height:30px;font-size:11px;background:linear-gradient(135deg,#3B9EFF,#2563EB);flex-shrink:0">${nome.slice(0,2).toUpperCase()}</div>
+<div style="flex:1;min-width:90px">
+<div style="font-weight:600;font-size:13px">${nome}</div>
+${cur ? `<div style="font-size:10px;color:${colorByState[cur]};font-weight:600;margin-top:2px">${labelByState[cur]}</div>` : ''}
+</div>
+<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap">
+${btn('✓ Veio', '#10B981', `classificarPresenca('${c.id}','${c.vaga_id}','${c.profissional_id}','presente')`, sel('presente'))}
+${btn('Saiu antes', '#F59E0B', `classificarPresencaSaiu('${c.id}','${c.vaga_id}','${c.profissional_id}')`, selSaiu)}
+${btn('✗ Faltou', '#EF4444', `confirmarFaltou('${c.id}','${c.vaga_id}','${c.profissional_id}','${nomeEsc}')`, sel('faltou'))}
+</div>
+</div>`;
+}).join('');
+}
+}
+} else {
+const nomes = v.contratados || [];
+listaHTML = nomes.length
+? nomes.map(nome => `
 <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:6px">
 <div class="avatar-btn" style="width:30px;height:30px;font-size:11px;background:linear-gradient(135deg,#3B9EFF,#2563EB);flex-shrink:0">${(nome||'?').slice(0,2).toUpperCase()}</div>
 <div style="flex:1;font-weight:600;font-size:13px">${nome}</div>
-${ fase === 'fin'
-? `<div style="display:flex;gap:4px">
-<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled title="Disponível na próxima fase">Compareceu</button>
-<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled>Saiu antes</button>
-<button class="btn btn-ghost btn-sm" style="font-size:10px;padding:4px 9px;border:1px solid var(--border)" disabled>Faltou</button>
-</div>`
-: '' }
 </div>`).join('')
 : `<div style="padding:10px;color:var(--gray);font-size:12px;font-style:italic;text-align:center">Nenhum contratado ainda</div>`;
+}
 return `<div style="margin-bottom:18px">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
 <span style="width:7px;height:7px;border-radius:50%;background:${corStatus};flex-shrink:0"></span>
@@ -4455,21 +4499,17 @@ return `<div style="margin-bottom:18px">
 <span style="font-size:11px;color:var(--gray)">· ${hora}</span>
 <span style="margin-left:auto;font-weight:700;font-size:13px;color:${corStatus}">${cont}/${tot}</span>
 </div>
-${corpoContratados}
+${listaHTML}
 ${ !enc && fase !== 'fin' ? `<button class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%;font-size:11px;border:1px solid var(--border)" onclick="abrirCandidatos('${v.id}')">Ver candidatos →</button>` : '' }
 </div>`;
 };
-const dica = fase === 'fin'
-? `<div style="margin-top:6px;padding:10px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;font-size:11px;color:#92400e">⚙ Classificação de presença (Compareceu / Saiu antes / Faltou) será habilitada na próxima entrega.</div>`
-: '';
-body.innerHTML = countdownHTML + g.funcoes.map(renderFuncao).join('') + dica;
-// ── tick do countdown ─────────────────────────────────
+body.innerHTML = countdownHTML + g.funcoes.map(renderFuncao).join('');
 if(fase === 'prox' && g.inicio){
 const tick = () => {
 const el = document.getElementById('evd-countdown');
 if(!el){ clearInterval(_evdInterval); _evdInterval = null; return; }
 const diff = g.inicio - new Date();
-if(diff <= 0){ renderEventoDetalhe(); return; } // virou Ao Vivo
+if(diff <= 0){ renderEventoDetalhe(); return; }
 const h = Math.floor(diff/3600000);
 const m = Math.floor((diff%3600000)/60000);
 const s = Math.floor((diff%60000)/1000);
@@ -4478,6 +4518,38 @@ el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${St
 tick();
 _evdInterval = setInterval(tick, 1000);
 }
+}
+function classificarPresencaSaiu(contId, vagaId, profId){
+_classCtx = { contId, vagaId, profId };
+openModal('modal-saiu-antes');
+}
+function confirmarFaltou(contId, vagaId, profId, nome){
+_classCtx = { contId, vagaId, profId };
+const el = document.getElementById('modal-faltou-nome');
+if(el) el.textContent = nome;
+openModal('modal-confirmar-faltou');
+}
+async function executarClassificacaoEstado(estado, modalId){
+if(!_classCtx){ if(modalId) closeModal(modalId); return; }
+const { contId, vagaId, profId } = _classCtx;
+if(modalId) closeModal(modalId);
+await classificarPresenca(contId, vagaId, profId, estado);
+}
+async function classificarPresenca(contId, vagaId, profId, estado){
+const { error } = await sb.rpc('registrar_presenca_estado', {
+p_vaga_id: vagaId, p_profissional_id: profId, p_estado: estado, p_lat: null, p_lng: null
+});
+if(error){ showToast('Erro: ' + (error.message||'tente novamente')); return; }
+const c = EVENTO_ATIVO?.contratacoes?.find(x => x.id === contId);
+if(c) c.presenca = estado;
+if(currentScreen === 'screen-evento-detalhe') renderEventoDetalhe();
+const msg = {
+presente: '✓ Compareceu registrado',
+saiu_autorizado: '↩ Saída autorizada registrada',
+saiu_desleixo: '⚠ Saída sem autorização — falta registrada',
+faltou: '✗ Falta registrada'
+};
+showToast(msg[estado] || 'Presença atualizada');
 }
 function renderEmpVagasList(){
 const wrap = document.getElementById('emp-vagas-list');
@@ -6381,6 +6453,41 @@ async function enviarAvaliacaoEmpresa(){
 </div>
 <button class="btn btn-primary btn-block" style="margin-bottom:10px" id="btn-enviar-aval-emp" onclick="enviarAvaliacaoEmpresa()" disabled>Enviar avaliação</button>
 <button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-avaliar-empresa')">Cancelar</button>
+</div>
+</div>
+</div>
+
+
+<div class="modal-overlay" id="modal-saiu-antes">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Você autorizou a saída?</div>
+<button class="modal-close" onclick="closeModal('modal-saiu-antes')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div style="font-size:13px;color:var(--gray);margin-bottom:16px;line-height:1.5">Quando o profissional saiu antes do término do evento, marque se a saída teve sua autorização.</div>
+<button class="btn btn-primary btn-block" style="margin-bottom:4px" onclick="executarClassificacaoEstado('saiu_autorizado','modal-saiu-antes')">Sim, eu autorizei</button>
+<div style="font-size:11px;color:var(--gray);margin-bottom:14px;text-align:center">Sem penalidade ao profissional.</div>
+<button class="btn btn-danger btn-block" style="margin-bottom:4px" onclick="executarClassificacaoEstado('saiu_desleixo','modal-saiu-antes')">Não, saiu sem autorização</button>
+<div style="font-size:11px;color:var(--red);margin-bottom:14px;text-align:center">Vai gerar uma falta no histórico.</div>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-saiu-antes')">Cancelar</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="modal-confirmar-faltou">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Marcar como faltou?</div>
+<button class="modal-close" onclick="closeModal('modal-confirmar-faltou')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div style="font-size:13px;color:var(--gray);margin-bottom:6px">Profissional:</div>
+<div id="modal-faltou-nome" style="font-family:'Sora',sans-serif;font-weight:700;font-size:16px;margin-bottom:14px"></div>
+<div style="font-size:12px;color:#92400e;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:16px;line-height:1.5">⚠️ Isto vai gerar uma <b>falta automática</b> no histórico, com bloqueio temporário de 7 a 30 dias dependendo do histórico.</div>
+<button class="btn btn-danger btn-block" style="margin-bottom:10px" onclick="executarClassificacaoEstado('faltou','modal-confirmar-faltou')">Confirmar falta</button>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-confirmar-faltou')">Cancelar</button>
 </div>
 </div>
 </div>
