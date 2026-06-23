@@ -964,6 +964,7 @@ body{background:#D8E3F5;min-height:100vh}
 <div id="evd-subtitle" style="font-size:11px;color:var(--gray)"></div>
 </div>
 <span class="badge" id="evd-fase-badge" style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:99px"></span>
+<button class="icon-btn" id="evd-edit-btn" onclick="abrirModalEditarEvento()" style="display:none;margin-left:6px" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
 </div>
 <div class="scroll-content">
 <div id="evd-body" style="padding:14px 20px 32px"></div>
@@ -2239,7 +2240,10 @@ try {
 const res = await sb.from('vagas').select('*, empresas(nome)').eq('status','ativa').order('created_at',{ascending:false}).limit(50);
 data = res.data;
 } catch(e) { console.warn('vagas:', e.message); return; }
-const idsAtivas = new Set((data||[]).map(v => v.id));
+// Filtra vagas cuja hora_termino já passou (evita exibir vagas vencidas com status='ativa')
+const _agora = new Date();
+data = (data||[]).filter(v => !v.hora_termino || new Date(v.hora_termino) >= _agora);
+const idsAtivas = new Set(data.map(v => v.id));
 // Remove do cache local vagas que não estão mais ativas no banco
 for(let i = VAGAS_LIST.length - 1; i>= 0; i--){
 if(!idsAtivas.has(VAGAS_LIST[i].id)){
@@ -4312,7 +4316,7 @@ const fmtIni  = g.inicio  ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',
 const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
 return `<div style="margin:4px 0 8px;padding:10px 12px;background:rgba(31,77,58,.06);border-radius:12px">
 <div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${g.nome}</div>
-<div style="font-size:12px;color:var(--gray);margin-top:2px">${fmtData} · ${fmtIni}–${fmtFim} · ${g.funcoes.length} funções</div>
+<div style="font-size:12px;color:var(--gray);margin-top:2px">${fmtData} · ${fmtIni}–${fmtFim} · ${g.funcoes.length} ${g.funcoes.length===1?'função':'funções'}</div>
 </div>`;
 }
 function faseEvento(g, agora){
@@ -4416,7 +4420,9 @@ titleEl.textContent = g.nome || 'Evento';
 const fmtData = g.inicio ? g.inicio.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}) : '';
 const fmtIni  = g.inicio ? g.inicio.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
 const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
-subEl.textContent = `${fmtData} · ${fmtIni}${fmtFim?'–'+fmtFim:''} · ${g.funcoes.length} função${g.funcoes.length!==1?'es':''}`;
+subEl.textContent = `${fmtData} · ${fmtIni}${fmtFim?'–'+fmtFim:''} · ${g.funcoes.length} ${g.funcoes.length===1?'função':'funções'}`;
+const editBtn = document.getElementById('evd-edit-btn');
+if(editBtn) editBtn.style.display = (g.evento_id ? 'inline-flex' : 'none');
 const cores = { vivo:{bg:'rgba(34,197,94,.12)',fg:'var(--green)',label:'AO VIVO'}, prox:{bg:'rgba(37,99,235,.1)',fg:'var(--blue-mid)',label:'PRÓXIMO'}, fin:{bg:'rgba(107,114,128,.12)',fg:'var(--gray)',label:'FINALIZADO'} };
 badgeEl.style.background = cores[fase].bg;
 badgeEl.style.color = cores[fase].fg;
@@ -4648,6 +4654,205 @@ if(typeof renderEmpEventos === 'function') renderEmpEventos();
 if(typeof renderEmpVagasHome === 'function') renderEmpVagasHome();
 } finally {
 if(btn){ btn.disabled = false; btn.textContent = 'Publicar evento'; }
+}
+}
+let _editarEventoCtx = null;
+function abrirModalEditarEvento(){
+const g = EVENTO_ATIVO;
+if(!g){ showToast('Evento não disponível'); return; }
+if(!g.evento_id){ showToast('Eventos legados não podem ser editados'); return; }
+const ini = g.inicio, fim = g.termino;
+const pad = n => String(n).padStart(2,'0');
+const dataStr = ini ? `${ini.getFullYear()}-${pad(ini.getMonth()+1)}-${pad(ini.getDate())}` : '';
+const horaIniStr = ini ? `${pad(ini.getHours())}:${pad(ini.getMinutes())}` : '18:00';
+const horaFimStr = fim ? `${pad(fim.getHours())}:${pad(fim.getMinutes())}` : '23:00';
+const local = (g.funcoes[0] && (g.funcoes[0].local || 'Uberlândia')) || 'Uberlândia';
+_editarEventoCtx = {
+eventoId: g.evento_id,
+eventoNome: g.nome,
+originalVagaIds: g.funcoes.map(f => f.id),
+funcoes: g.funcoes.map(v => {
+const vIni = v.inicioISO ? new Date(v.inicioISO) : null;
+const vFim = v.terminoISO ? new Date(v.terminoISO) : null;
+const valNum = parseFloat(String(v.val||'0').replace(/[^\d.,]/g,'').replace(',','.')) || 0;
+return {
+_vagaId: v.id,
+fn: v.fn,
+qtd: v.totalVagas || 1,
+valor: valNum,
+horaIni: vIni ? `${pad(vIni.getHours())}:${pad(vIni.getMinutes())}` : horaIniStr,
+horaFim: vFim ? `${pad(vFim.getHours())}:${pad(vFim.getMinutes())}` : horaFimStr,
+_temContratados: (v.contratados||[]).length > 0,
+};
+}),
+};
+const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+set('ee-nome', g.nome || '');
+set('ee-data', dataStr);
+const dataEl = document.getElementById('ee-data');
+if(dataEl) dataEl.min = ''; // permite datas passadas para editar/limpar eventos antigos
+set('ee-local', local);
+set('ee-hora-ini', horaIniStr);
+set('ee-hora-fim', horaFimStr);
+cancelarAdicaoFuncaoEditar();
+renderListaFuncoesEditar();
+openModal('modal-editar-evento');
+}
+function renderListaFuncoesEditar(){
+const wrap = document.getElementById('ee-funcoes-lista');
+const cnt = document.getElementById('ee-fn-count');
+if(!wrap || !_editarEventoCtx) return;
+const n = _editarEventoCtx.funcoes.length;
+if(cnt) cnt.textContent = `${n} ${n===1?'função':'funções'}`;
+if(!n){
+wrap.innerHTML = `<div style="padding:14px;text-align:center;color:var(--gray);font-size:12px;font-style:italic;border:1px dashed var(--border);border-radius:10px">Nenhuma função</div>`;
+return;
+}
+wrap.innerHTML = _editarEventoCtx.funcoes.map((f, i) => {
+const novaTag = !f._vagaId ? '<span style="font-size:9px;color:var(--green);font-weight:700;background:rgba(34,197,94,.12);padding:2px 6px;border-radius:6px;margin-left:6px">NOVA</span>' : '';
+const warn = f._temContratados ? '<div style="font-size:10px;color:#92400e;margin-top:2px">⚠ Tem contratados — remoção pode afetá-los</div>' : '';
+return `<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+<div style="flex:1;min-width:0">
+<div style="font-weight:700;font-size:13px">${f.qtd}x ${f.fn}${novaTag}</div>
+<div style="font-size:11px;color:var(--gray)">R$ ${f.valor} · ${f.horaIni}–${f.horaFim}</div>
+${warn}
+</div>
+<button class="icon-btn" onclick="removerFuncaoEditar(${i})" style="color:var(--red)" title="Remover">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+</button>
+</div>`;
+}).join('');
+}
+function abrirAdicaoFuncaoEditar(){
+const form = document.getElementById('ee-add-form');
+const btn = document.getElementById('ee-btn-add');
+if(!form) return;
+const ini = document.getElementById('ee-hora-ini')?.value || '18:00';
+const fim = document.getElementById('ee-hora-fim')?.value || '23:00';
+const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+set('ee-fn-ini', ini);
+set('ee-fn-fim', fim);
+set('ee-fn-qtd', '1');
+set('ee-fn-valor', '');
+document.querySelectorAll('#ee-fn-chips .chip').forEach((c,i) => c.classList.toggle('active', i === 0));
+form.style.display = 'block';
+if(btn) btn.style.display = 'none';
+}
+function cancelarAdicaoFuncaoEditar(){
+const form = document.getElementById('ee-add-form');
+const btn = document.getElementById('ee-btn-add');
+if(form) form.style.display = 'none';
+if(btn) btn.style.display = 'block';
+}
+function adicionarFuncaoEditar(){
+if(!_editarEventoCtx) return;
+const chipAtivo = document.querySelector('#ee-fn-chips .chip.active');
+const fn = chipAtivo ? chipAtivo.textContent.trim() : 'Garçom';
+const qtd = parseInt(document.getElementById('ee-fn-qtd')?.value || '1');
+const valor = parseFloat(document.getElementById('ee-fn-valor')?.value || '0');
+const horaIni = document.getElementById('ee-fn-ini')?.value || '18:00';
+const horaFim = document.getElementById('ee-fn-fim')?.value || '23:00';
+if(qtd < 1){ showToast('Quantidade mínima é 1'); return; }
+if(valor <= 0){ showToast('Informe o valor por profissional'); return; }
+if(horaIni >= horaFim){ showToast('Início deve ser antes do término'); return; }
+_editarEventoCtx.funcoes.push({ fn, qtd, valor, horaIni, horaFim });
+cancelarAdicaoFuncaoEditar();
+renderListaFuncoesEditar();
+}
+function removerFuncaoEditar(idx){
+if(!_editarEventoCtx) return;
+const f = _editarEventoCtx.funcoes[idx];
+if(!f) return;
+if(f._temContratados){
+if(!confirm(`A função "${f.fn}" tem contratados. Remover mesmo assim?`)) return;
+}
+_editarEventoCtx.funcoes.splice(idx, 1);
+renderListaFuncoesEditar();
+}
+async function salvarEditarEvento(){
+if(!_editarEventoCtx) return;
+const nome = document.getElementById('ee-nome')?.value?.trim();
+const dataVal = document.getElementById('ee-data')?.value;
+const horaIni = document.getElementById('ee-hora-ini')?.value;
+const horaFim = document.getElementById('ee-hora-fim')?.value;
+const local = document.getElementById('ee-local')?.value?.trim() || 'Uberlândia';
+if(!nome){ showToast('Informe o nome do evento'); return; }
+if(!dataVal){ showToast('Informe a data'); return; }
+if(horaIni >= horaFim){ showToast('Início deve ser antes do término'); return; }
+if(!_editarEventoCtx.funcoes.length){ showToast('Adicione pelo menos uma função'); return; }
+const btn = document.getElementById('ee-btn-salvar');
+if(btn){ btn.disabled = true; btn.textContent = 'Salvando...'; }
+try {
+const { error: errEv } = await sb.from('eventos').update({ nome, local }).eq('id', _editarEventoCtx.eventoId);
+if(errEv){ showToast('Erro ao atualizar evento'); console.warn(errEv); return; }
+const currentVagaIds = new Set(_editarEventoCtx.funcoes.filter(f => f._vagaId).map(f => f._vagaId));
+const toDelete = _editarEventoCtx.originalVagaIds.filter(id => !currentVagaIds.has(id));
+let errosDel = 0;
+for(const vagaId of toDelete){
+const { error } = await sb.from('vagas').delete().eq('id', vagaId);
+if(error){ console.warn('delete vaga:', error); errosDel++; }
+}
+if(errosDel) showToast(`${errosDel} função(ões) não puderam ser removidas (talvez tenham contratacoes ativas).`);
+for(const f of _editarEventoCtx.funcoes){
+const dataISOIni = new Date(`${dataVal}T${f.horaIni}:00`).toISOString();
+const dataISOFim = new Date(`${dataVal}T${f.horaFim}:00`).toISOString();
+if(f._vagaId){
+const { error } = await sb.from('vagas').update({
+data_evento: dataISOIni, hora_termino: dataISOFim,
+valor: f.valor, total_vagas: f.qtd, local,
+}).eq('id', f._vagaId);
+if(error) console.warn('update vaga:', error);
+} else {
+await publicarVagaBanco({
+titulo: f.fn, fn: f.fn,
+totalVagas: f.qtd, valorNum: f.valor,
+dataISO: dataISOIni, horaTerminoISO: dataISOFim,
+local, eventoId: _editarEventoCtx.eventoId,
+});
+}
+}
+closeModal('modal-editar-evento');
+showToast('Alterações salvas');
+const evId = _editarEventoCtx.eventoId;
+_editarEventoCtx = null;
+await carregarVagasEmpresaBanco();
+abrirEvento(evId);
+} finally {
+if(btn){ btn.disabled = false; btn.textContent = 'Salvar alterações'; }
+}
+}
+function confirmarDeletarEvento(){
+if(!_editarEventoCtx) return;
+const el = document.getElementById('modal-del-evento-nome');
+if(el) el.textContent = _editarEventoCtx.eventoNome || 'Evento';
+openModal('modal-confirmar-delete-evento');
+}
+async function executarDeletarEvento(){
+if(!_editarEventoCtx) return;
+const eventoId = _editarEventoCtx.eventoId;
+const vagaIds = _editarEventoCtx.originalVagaIds;
+const btn = document.getElementById('btn-del-evento-confirmar');
+if(btn){ btn.disabled = true; btn.textContent = 'Deletando...'; }
+try {
+let erros = 0;
+for(const vagaId of vagaIds){
+const { error } = await sb.from('vagas').delete().eq('id', vagaId);
+if(error){ console.warn('delete vaga:', error); erros++; }
+}
+const { error } = await sb.from('eventos').delete().eq('id', eventoId);
+if(error){
+showToast('Erro ao deletar evento: ' + (error.message || 'verifique vagas com contratações.'));
+console.warn(error);
+return;
+}
+closeModal('modal-confirmar-delete-evento');
+closeModal('modal-editar-evento');
+showToast(erros ? `Evento deletado (${erros} função(ões) com erro).` : 'Evento deletado');
+_editarEventoCtx = null;
+await carregarVagasEmpresaBanco();
+goTo('screen-eventos-emp');
+} finally {
+if(btn){ btn.disabled = false; btn.textContent = 'Confirmar deleção'; }
 }
 }
 function classificarPresencaSaiu(contId, vagaId, profId){
@@ -6673,6 +6878,105 @@ async function enviarAvaliacaoEmpresa(){
 <div id="ne-warning" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.5"></div>
 <button class="btn btn-primary btn-block" id="ne-btn-publicar" style="margin-bottom:12px" onclick="publicarEvento()">Publicar evento</button>
 <button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-novo-evento')">Cancelar</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="modal-editar-evento">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Editar Evento</div>
+<button class="modal-close" onclick="closeModal('modal-editar-evento')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div class="form-section-title">Dados do evento</div>
+<div style="margin-bottom:12px">
+<span class="inp-label">Nome do evento *</span>
+<input class="inp" id="ee-nome" />
+</div>
+<div class="form-row" style="margin-bottom:12px">
+<div>
+<span class="inp-label">Data *</span>
+<input class="inp" type="date" id="ee-data" />
+</div>
+<div>
+<span class="inp-label">Local</span>
+<input class="inp" id="ee-local" />
+</div>
+</div>
+<div class="form-row" style="margin-bottom:18px">
+<div>
+<span class="inp-label">Início *</span>
+<input class="inp" type="time" id="ee-hora-ini" />
+</div>
+<div>
+<span class="inp-label">Término *</span>
+<input class="inp" type="time" id="ee-hora-fim" />
+</div>
+</div>
+<div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between">
+<span>Funções</span>
+<span style="font-size:11px;font-weight:400;color:var(--gray)" id="ee-fn-count">0</span>
+</div>
+<div id="ee-funcoes-lista" style="margin-bottom:10px"></div>
+<div id="ee-add-form" style="display:none;background:rgba(31,77,58,.04);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+<div style="font-weight:700;font-size:13px;margin-bottom:10px">Adicionar função</div>
+<div class="chip-group" id="ee-fn-chips" style="margin-bottom:10px">
+<button class="chip active" type="button" onclick="toggleChipFuncao(this)">Garçom</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Bartender</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Cumim</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Aux. Cozinha</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Aux. Limpeza</button>
+<button class="chip" type="button" onclick="toggleChipFuncao(this)">Recepcionista</button>
+</div>
+<div class="form-row" style="margin-bottom:10px">
+<div>
+<span class="inp-label">Quantidade *</span>
+<input class="inp" type="number" id="ee-fn-qtd" value="1" min="1" />
+</div>
+<div>
+<span class="inp-label">Valor (R$) *</span>
+<input class="inp" type="number" id="ee-fn-valor" placeholder="100" />
+</div>
+</div>
+<div class="form-row" style="margin-bottom:6px">
+<div>
+<span class="inp-label">Início</span>
+<input class="inp" type="time" id="ee-fn-ini" />
+</div>
+<div>
+<span class="inp-label">Término</span>
+<input class="inp" type="time" id="ee-fn-fim" />
+</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:8px">
+<button class="btn btn-primary btn-sm" style="flex:1" onclick="adicionarFuncaoEditar()">Adicionar</button>
+<button class="btn btn-ghost btn-sm" style="flex:1;border:1px solid var(--border)" onclick="cancelarAdicaoFuncaoEditar()">Cancelar</button>
+</div>
+</div>
+<button class="btn btn-ghost btn-block" id="ee-btn-add" style="margin-bottom:18px;border:1.5px dashed var(--border);font-size:13px" onclick="abrirAdicaoFuncaoEditar()">+ Adicionar função</button>
+<button class="btn btn-primary btn-block" id="ee-btn-salvar" style="margin-bottom:10px" onclick="salvarEditarEvento()">Salvar alterações</button>
+<button class="btn btn-ghost btn-block" style="margin-bottom:18px" onclick="closeModal('modal-editar-evento')">Cancelar</button>
+<div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:24px">
+<button class="btn btn-danger btn-block" onclick="confirmarDeletarEvento()">Deletar evento</button>
+<div style="font-size:11px;color:var(--gray);margin-top:6px;text-align:center">Remove o evento e todas as funções/vagas. Não pode ser desfeito.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="modal-confirmar-delete-evento">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Deletar evento?</div>
+<button class="modal-close" onclick="closeModal('modal-confirmar-delete-evento')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div style="font-size:13px;color:var(--gray);margin-bottom:6px">Evento:</div>
+<div id="modal-del-evento-nome" style="font-family:'Sora',sans-serif;font-weight:700;font-size:16px;margin-bottom:14px"></div>
+<div style="font-size:12px;color:#92400e;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:16px;line-height:1.5">⚠️ Isto vai remover o evento e <b>todas as funções/vagas associadas</b>. Não pode ser desfeito.</div>
+<button class="btn btn-danger btn-block" id="btn-del-evento-confirmar" style="margin-bottom:10px" onclick="executarDeletarEvento()">Confirmar deleção</button>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-confirmar-delete-evento')">Cancelar</button>
 </div>
 </div>
 </div>
