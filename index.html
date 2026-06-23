@@ -1591,6 +1591,7 @@ onkeydown="if(event.key==='Enter')enviarMensagem()"/>
 const RANKINGS = {'Garçom':[],'Bartender':[],'Cumim':[],'Aux. Cozinha':[],'Aux. Limpeza':[],'Recepcionista':[]};
 const CANDIDATOS = [];
 let CONTRATACOES_PROF = []; // Contratações ativas do profissional logado
+const AVALIACOES_EMP_FEITAS_PROF = new Set(); // contratacao_ids já avaliadas pelo prof logado
 // Helper: eventos de um candidato em uma função específica
 function evCandFn(cand, fn){
 const r = (RANKINGS[fn]||[]).find(p=>p.nome===cand.nome);
@@ -5658,6 +5659,13 @@ const { data: vagasAll } = await sb.from('vagas')
 .in('id', vagaIds);
 const vagasMap = Object.fromEntries((vagasAll||[]).map(v=>[v.id,v]));
 CONTRATACOES_PROF = ativos.map(c => ({ ...c, vagaDetalhes: vagasMap[c.vaga_id]||null }));
+// Busca quais contratações o prof já avaliou (para esconder botão Avaliar empresa)
+try {
+const idsSet = new Set(CONTRATACOES_PROF.map(c => c.id));
+const { data: avFeitas } = await sb.from('avaliacoes_visiveis').select('contratacao_id').eq('avaliador_tipo','profissional');
+AVALIACOES_EMP_FEITAS_PROF.clear();
+(avFeitas||[]).forEach(a => { if(idsSet.has(a.contratacao_id)) AVALIACOES_EMP_FEITAS_PROF.add(a.contratacao_id); });
+} catch(e){ console.warn('avFeitas prof:', e.message); }
 } else {
 CONTRATACOES_PROF = [];
 }
@@ -5798,8 +5806,12 @@ const fimEvento = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const eventoPassou = fimEvento && new Date() > fimEvento;
 if(eventoPassou){ // Avaliação SÓ depois que evento termina
 const empNome = vd?.empresas?.nome || vd?.empresa || 'a empresa';
+const jaAvaliouEmp = AVALIACOES_EMP_FEITAS_PROF.has(c.id);
 return `<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Evento encerrado</div>
-<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;width:100%;border:1px solid var(--border)" onclick="abrirAvaliacaoEmpresa('${c.id}','${empNome}')">⭐ Avaliar empresa</button>`;
+${jaAvaliouEmp
+? `<div style="margin-top:8px;font-size:11px;width:100%;text-align:center;padding:8px;background:rgba(34,197,94,.1);color:var(--green);border-radius:8px;font-weight:600">✓ Empresa avaliada</div>`
+: `<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;width:100%;border:1px solid var(--border)" onclick="abrirAvaliacaoEmpresa('${c.id}','${empNome}')">⭐ Avaliar empresa</button>`
+}`;
 }
 return `<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="confirmarDesistirContratacao('${c.id}','${titulo}')">
 Desistir desta contratacao
@@ -6669,10 +6681,12 @@ async function enviarAvaliacaoEmpresa(){
     return;
   }
 
+  AVALIACOES_EMP_FEITAS_PROF.add(_avalEmpContratacaoId);
   closeModal('modal-avaliar-empresa');
   showToast('Avaliação enviada! Obrigado pelo feedback.');
   _avalEmpContratacaoId = null;
   _avalEmpNota = 0;
+  if(typeof renderContratacoesProfHome === 'function') renderContratacoesProfHome();
 }
 </script>
 <div class="modal-overlay" id="modal-convite-link">
