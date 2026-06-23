@@ -1909,6 +1909,17 @@ window.history.replaceState({}, '', _u);
 // Usuário autenticado atual
 let CURRENT_USER = null;
 let CURRENT_PROFILE = null; // profissional ou empresa do banco
+function estaProfBloqueado(){
+if(!CURRENT_PROFILE) return null;
+if(CURRENT_PROFILE.banido === true) return { motivo: 'banido', mensagem: 'Sua conta está banida e não pode mais se candidatar.' };
+const ate = CURRENT_PROFILE.bloqueado_ate ? new Date(CURRENT_PROFILE.bloqueado_ate) : null;
+if(ate && ate > new Date()){
+const dias = Math.max(1, Math.ceil((ate - new Date()) / (1000*60*60*24)));
+const dataFmt = ate.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
+return { motivo: 'bloqueado', dias, ate, mensagem: `Você está bloqueado por ${dias} dia${dias>1?'s':''} (até ${dataFmt}) por faltas acumuladas. Não pode se candidatar nem aceitar convites neste período.` };
+}
+return null;
+}
 // ─── AUTH ─────────────────────────────────────────────
 async function doLogin(){
 const email = document.getElementById('login-email')?.value.trim();
@@ -3092,6 +3103,19 @@ if(vl.candidaturas.length>= vl.totalVagas) return;
 // Bloqueia candidatura em evento já encerrado
 if(vl.dataISO && new Date(vl.dataISO) < new Date()){
 showToast('Este evento já foi encerrado.');
+return;
+}
+// Bloqueia profissionais com bloqueio ativo ou banidos
+const bloqueio = estaProfBloqueado();
+if(bloqueio){
+const statusWrap = document.getElementById('modal-vaga-status');
+if(statusWrap){
+statusWrap.style.display = 'flex';
+statusWrap.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${bloqueio.mensagem}`;
+statusWrap.style.color = 'var(--red)';
+statusWrap.style.background = 'rgba(239,68,68,.08)';
+statusWrap.style.borderColor = 'rgba(239,68,68,.25)';
+}
 return;
 }
 // Limite de 3 candidaturas simultâneas
@@ -5969,6 +5993,9 @@ renderCandidatos();
 btn.textContent = 'Enviar convite'; btn.disabled = false;
 }
 async function aceitarConvite(id){
+// Bloqueia se o prof estiver bloqueado/banido
+const bloqueio = estaProfBloqueado();
+if(bloqueio){ showToast(bloqueio.mensagem); return; }
 // ── RPC transacional — contratacao + candidatura + vaga em uma só operação ──
 const { data, error } = await sb.rpc('aceitar_convite', {
 p_contratacao_id: id,
