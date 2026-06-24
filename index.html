@@ -648,6 +648,7 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 <div style="font-size:28px">💰</div>
 </div>
+<div id="banner-faltas-prof" style="display:none;margin:14px 20px 0;padding:11px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.1);font-size:12px;line-height:1.45;color:#374151"></div>
 <div id="secao-contratacoes" style="display:none">
 <div class="sep"></div>
 <div class="sec-head">
@@ -5038,7 +5039,7 @@ const plano = getPlanoProf(nomeProfissional);
 const diasBase = PLANOS[plano].diasBloqueio;
 let bloqueadoAteISO = null;
 let banido = false;
-if(e.faltas>= 3){
+if(e.faltas>= 4){
 e.banido = true;
 banido = true;
 } else {
@@ -5104,9 +5105,9 @@ renderEmpVagasList();
 renderCandidatos();
 const primeiroNome = nomeProfissional.split(' ')[0];
 if(e.banido){
-showToast(`${primeiroNome} banido permanentemente após 3ª falta.`);
+showToast(`${primeiroNome} banido permanentemente após 4ª falta.`);
 } else {
-const dias = e.faltas === 1 ? 30 : e.faltas === 2 ? 90 : 90;
+const dias = e.faltas === 1 ? 7 : e.faltas === 2 ? 21 : 30;
 showToast(`Falta registrada. ${primeiroNome} bloqueado por ${dias} dias.`);
 }
 }
@@ -5665,6 +5666,50 @@ if(status === 'SUBSCRIBED'){
 }
 // ─── REALTIME PROFISSIONAL ────────────────────────────
 // ─── CONTRATAÇÕES DO PROFISSIONAL ────────────────────────────
+async function atualizarBannerFaltas(){
+const banner = document.getElementById('banner-faltas-prof');
+if(!banner || !CURRENT_PROFILE || loginType !== 'prof'){ if(banner) banner.style.display='none'; return; }
+// Banido: vermelho permanente
+if(CURRENT_PROFILE.banido === true){
+banner.style.display = 'block';
+banner.style.background = 'rgba(239,68,68,.1)';
+banner.style.borderColor = 'rgba(239,68,68,.4)';
+banner.style.color = '#991b1b';
+banner.innerHTML = `🚫 Sua conta está <b>banida permanentemente</b> após 4 faltas em 90 dias.`;
+return;
+}
+// Bloqueado agora: vermelho com prazo
+if(CURRENT_PROFILE.bloqueado_ate && new Date(CURRENT_PROFILE.bloqueado_ate) > new Date()){
+const ate = new Date(CURRENT_PROFILE.bloqueado_ate);
+const dias = Math.max(1, Math.ceil((ate - new Date()) / 86400000));
+const fmt = ate.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
+banner.style.display = 'block';
+banner.style.background = 'rgba(239,68,68,.1)';
+banner.style.borderColor = 'rgba(239,68,68,.4)';
+banner.style.color = '#991b1b';
+banner.innerHTML = `🚫 Você está <b>bloqueado por ${dias} dia${dias>1?'s':''}</b> (até ${fmt}). Não pode se candidatar nem aceitar convites.`;
+return;
+}
+// Warning preventivo: tem falta mas não bloqueado
+try {
+const desde = new Date(Date.now() - 90*86400000).toISOString();
+const { count } = await sb.from('faltas')
+.select('id', { count: 'exact', head: true })
+.eq('profissional_id', CURRENT_PROFILE.id)
+.is('revogada_em', null)
+.gte('created_at', desde);
+if((count||0) > 0){
+const proximo = count === 1 ? 'bloqueio de 21 dias' : count === 2 ? 'bloqueio de 30 dias' : 'BANIMENTO permanente';
+banner.style.display = 'block';
+banner.style.background = 'rgba(245,158,11,.1)';
+banner.style.borderColor = 'rgba(245,158,11,.35)';
+banner.style.color = '#92400e';
+banner.innerHTML = `⚠️ Atenção: você tem <b>${count} falta${count>1?'s':''}</b> nos últimos 90 dias. Próxima falta = <b>${proximo}</b>.`;
+} else {
+banner.style.display = 'none';
+}
+} catch(e){ console.warn('banner faltas:', e.message); banner.style.display = 'none'; }
+}
 async function carregarContratacoesBanco(){
 if(!CURRENT_USER || !CURRENT_PROFILE?.id) return;
 try {
@@ -5674,7 +5719,7 @@ const { data: todasCont, error } = await sb.from('contratacoes')
 if(error){ console.warn('carregarContratacoesBanco error:', error.message); }
 // Filtra client-side: só as do profissional logado e status confirmado
 const ativos = (todasCont||[]).filter(c =>
-c.profissional_id === CURRENT_PROFILE.id && ['confirmado','convite'].includes(c.status)
+c.profissional_id === CURRENT_PROFILE.id && ['confirmado','convite','expirado'].includes(c.status)
 );
 if(ativos.length){
 const vagaIds = ativos.map(c => c.vaga_id).filter(Boolean);
@@ -5695,6 +5740,7 @@ CONTRATACOES_PROF = [];
 }
 } catch(e){ console.warn('carregarContratacoesBanco:', e.message); }
 renderContratacoesProfHome();
+atualizarBannerFaltas();
 }
 // Intervalo global da contagem regressiva
 function renderContratacoesProfHome(){
@@ -5703,7 +5749,7 @@ const lista = document.getElementById('lista-contratacoes-prof');
 if(!secao || !lista) return;
 if(!CONTRATACOES_PROF.length){ secao.style.display = 'none'; return; }
 secao.style.display = 'block';
-const conviteExpirado = (c)=> c.status==='convite' && c.vagaDetalhes?.hora_termino && new Date(c.vagaDetalhes.hora_termino) < new Date();
+const conviteExpirado = (c)=> c.status==='expirado' || (c.status==='convite' && c.vagaDetalhes?.hora_termino && new Date(c.vagaDetalhes.hora_termino) < new Date());
 const nConvites = CONTRATACOES_PROF.filter(c=>c.status==='convite' && !conviteExpirado(c)).length;
 const tituloEl = document.getElementById('titulo-secao-contratacoes');
 if(tituloEl) tituloEl.textContent = nConvites> 0 ? `📩 Minhas contratações (${nConvites} convite${nConvites>1?'s':''} pendente${nConvites>1?'s':''})` : '✅ Minhas contratações';
@@ -5794,7 +5840,7 @@ const horaIni = vd?.data_evento ? new Date(vd.data_evento).toLocaleTimeString('p
 const horaFim = vd?.hora_termino ? new Date(vd.hora_termino).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
 const hora   = horaFim ? `${horaIni}–${horaFim}` : horaIni;
 const val    = vd?.valor ? `R$ ${parseFloat(vd.valor).toFixed(0)}` : '—';
-const isConvite = c.status === 'convite';
+const isConvite = c.status === 'convite' || c.status === 'expirado';
 const fimCard = vd?.hora_termino ? new Date(vd.hora_termino) : null;
 const passouCard = fimCard && new Date()> fimCard;
 return `
