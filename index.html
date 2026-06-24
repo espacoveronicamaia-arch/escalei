@@ -965,6 +965,7 @@ body{background:#D8E3F5;min-height:100vh}
 <div id="evd-subtitle" style="font-size:11px;color:var(--gray)"></div>
 </div>
 <span class="badge" id="evd-fase-badge" style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:99px"></span>
+<button class="icon-btn" id="evd-qr-btn" onclick="abrirModalQR()" style="display:none;margin-left:6px" title="QR de entrada"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z M17 17h4 M21 14v4 M14 17v4 M14 21h3"/></svg></button>
 <button class="icon-btn" id="evd-edit-btn" onclick="abrirModalEditarEvento()" style="display:none;margin-left:6px" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
 </div>
 <div class="scroll-content">
@@ -2385,7 +2386,7 @@ const { data: todasCands } = await sb.from('candidaturas')
 const candsRaw = (todasCands||[]).filter(c => c.status !== 'desistiu');
 // Contratacoes desta empresa (filtro no servidor)
 const { data: todasConts } = await sb.from('contratacoes')
-.select('id, status, profissional_id, vaga_id, presenca')
+.select('id, status, profissional_id, vaga_id, presenca, checkin_em, checkout_em')
 .in('vaga_id', vagaIds);
 const contsConfirmadas = (todasConts||[]).filter(c => c.status === 'confirmado');
 (todasConts||[]).forEach(c=>{ if(c.presenca) PRESENCAS_EMP[c.vaga_id+'_'+c.profissional_id]=c.presenca; });
@@ -4425,7 +4426,7 @@ if(!myEvento || !CURRENT_PROFILE){ return; }
 const vagaIds = new Set(myEvento.funcoes.map(v => v.id));
 // Filtra empresa_id para não bater na limitação do .in(uuid[]) — janela é pequena.
 const { data, error } = await sb.from('contratacoes')
-.select('id, vaga_id, profissional_id, presenca, status, profissionais(nome)')
+.select('id, vaga_id, profissional_id, presenca, status, checkin_em, checkout_em, profissionais(nome)')
 .eq('empresa_id', CURRENT_PROFILE.id);
 if(error){ console.warn('Erro contratacoes:', error); return; }
 if(EVENTO_ATIVO !== myEvento) return; // usuário navegou enquanto a query estava pendente
@@ -4449,6 +4450,13 @@ const fmtFim  = g.termino ? g.termino.toLocaleTimeString('pt-BR',{hour:'2-digit'
 subEl.textContent = `${fmtData} · ${fmtIni}${fmtFim?'–'+fmtFim:''} · ${g.funcoes.length} ${g.funcoes.length===1?'função':'funções'}`;
 const editBtn = document.getElementById('evd-edit-btn');
 if(editBtn) editBtn.style.display = (g.evento_id ? 'inline-flex' : 'none');
+// Botão QR: aparece quando empresa vê evento com evento_id e ainda não terminou (1h antes até término)
+const qrBtn = document.getElementById('evd-qr-btn');
+if(qrBtn){
+const janelaIni = g.inicio ? new Date(g.inicio.getTime() - 3600000) : null;
+const dentroJanela = g.evento_id && janelaIni && g.termino && agora >= janelaIni && agora <= g.termino;
+qrBtn.style.display = dentroJanela ? 'inline-flex' : 'none';
+}
 const cores = { vivo:{bg:'rgba(34,197,94,.12)',fg:'var(--green)',label:'AO VIVO'}, prox:{bg:'rgba(37,99,235,.1)',fg:'var(--blue-mid)',label:'PRÓXIMO'}, fin:{bg:'rgba(107,114,128,.12)',fg:'var(--gray)',label:'FINALIZADO'} };
 badgeEl.style.background = cores[fase].bg;
 badgeEl.style.color = cores[fase].fg;
@@ -4880,6 +4888,159 @@ goTo('screen-eventos-emp');
 } finally {
 if(btn){ btn.disabled = false; btn.textContent = 'Confirmar deleção'; }
 }
+}
+let _qrInstance = null;
+let _scannerInstance = null;
+let _scannerContId = null;
+function _loadScript(src){
+return new Promise((resolve, reject) => {
+if(document.querySelector(`script[src="${src}"]`)){ resolve(); return; }
+const s = document.createElement('script');
+s.src = src;
+s.onload = resolve;
+s.onerror = () => reject(new Error('Falha ao carregar: ' + src));
+document.head.appendChild(s);
+});
+}
+async function abrirModalQR(){
+if(!EVENTO_ATIVO || !EVENTO_ATIVO.evento_id){ showToast('Evento sem ID — não dá pra gerar QR'); return; }
+openModal('modal-qr-evento');
+const canvas = document.getElementById('qr-evt-canvas');
+const nome = document.getElementById('qr-evt-nome');
+const janela = document.getElementById('qr-evt-janela');
+if(canvas) canvas.innerHTML = '<div style="color:var(--gray);font-size:12px">Carregando...</div>';
+try {
+const { data, error } = await sb.rpc('obter_token_checkin', { p_evento_id: EVENTO_ATIVO.evento_id });
+if(error || !data?.ok){
+if(canvas) canvas.innerHTML = `<div style="color:var(--red);font-size:12px;text-align:center">${error?.message || data?.erro || 'Erro ao obter token'}</div>`;
+return;
+}
+const payload = `escalei:checkin:${data.evento_id}:${data.token}`;
+if(nome) nome.textContent = data.nome || EVENTO_ATIVO.nome || 'Evento';
+if(janela){
+const ini = new Date(data.inicio);
+const fim = new Date(data.termino);
+const pad = n => String(n).padStart(2,'0');
+const fmtD = (d) => d.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+janela.textContent = `${fmtD(ini)} · ${pad(ini.getHours())}:${pad(ini.getMinutes())}–${pad(fim.getHours())}:${pad(fim.getMinutes())}`;
+}
+await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+if(canvas){
+canvas.innerHTML = '';
+_qrInstance = new QRCode(canvas, {
+text: payload,
+width: 260, height: 260,
+colorDark: '#0F172A', colorLight: '#FFFFFF',
+correctLevel: QRCode.CorrectLevel.M
+});
+}
+} catch(e){
+console.warn('abrirModalQR:', e);
+if(canvas) canvas.innerHTML = '<div style="color:var(--red);font-size:12px">Erro ao carregar QR</div>';
+}
+}
+function fecharModalQR(){
+closeModal('modal-qr-evento');
+const canvas = document.getElementById('qr-evt-canvas');
+if(canvas) canvas.innerHTML = '';
+_qrInstance = null;
+}
+async function abrirScannerCheckin(contratacaoId){
+_scannerContId = contratacaoId;
+openModal('modal-scanner-checkin');
+const result = document.getElementById('scanner-result');
+const instr = document.getElementById('scanner-instr');
+const titulo = document.getElementById('scanner-title');
+if(result){ result.style.display = 'none'; result.innerHTML = ''; }
+if(titulo) titulo.textContent = 'Escanear QR';
+if(instr){ instr.style.display = 'block'; instr.textContent = 'Aponte para o QR exibido pela empresa.'; }
+try {
+await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.10/html5-qrcode.min.js');
+if(_scannerInstance){ try { await _scannerInstance.stop(); } catch(_){} _scannerInstance = null; }
+_scannerInstance = new Html5Qrcode('scanner-reader');
+await _scannerInstance.start(
+{ facingMode: 'environment' },
+{ fps: 10, qrbox: { width: 230, height: 230 } },
+(decodedText) => { _processarLeituraQR(decodedText); },
+() => {} // ignora frames sem QR
+);
+} catch(e){
+console.warn('abrirScannerCheckin:', e);
+if(instr) instr.textContent = '';
+if(result){
+result.style.display = 'block';
+result.style.background = 'rgba(239,68,68,.1)';
+result.style.color = '#991b1b';
+result.innerHTML = 'Não foi possível acessar a câmera. Verifique as permissões no navegador.';
+}
+}
+}
+async function _processarLeituraQR(decodedText){
+// Payload esperado: escalei:checkin:<evento_id>:<token>
+const partes = (decodedText||'').split(':');
+if(partes.length < 4 || partes[0] !== 'escalei' || partes[1] !== 'checkin'){
+_mostrarResultadoScanner(false, 'QR code não reconhecido. Confirme que está escaneando o QR do Escalei.');
+return;
+}
+const eventoId = partes[2];
+const token = partes.slice(3).join(':'); // tokens não devem ter ":", mas por segurança
+// Para o scanner enquanto processa
+if(_scannerInstance){ try { await _scannerInstance.stop(); } catch(_){} }
+// Pega localização (best effort, não bloqueia)
+let lat = null, lng = null;
+try {
+const pos = await new Promise((resolve, reject) => {
+if(!navigator.geolocation){ resolve(null); return; }
+navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), { timeout: 4000, enableHighAccuracy: false });
+});
+if(pos && pos.coords){ lat = pos.coords.latitude; lng = pos.coords.longitude; }
+} catch(_){}
+try {
+const { data, error } = await sb.rpc('registrar_checkin', {
+p_evento_id: eventoId, p_token: token, p_lat: lat, p_lng: lng
+});
+if(error){
+_mostrarResultadoScanner(false, error.message || 'Erro ao registrar');
+return;
+}
+if(!data?.ok){
+_mostrarResultadoScanner(false, data?.erro || 'Não foi possível registrar');
+return;
+}
+const acaoLabel = data.acao === 'checkin' ? '✓ Check-in registrado' : '↩ Check-out registrado';
+_mostrarResultadoScanner(true, acaoLabel + (data.em ? ' às ' + new Date(data.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : ''));
+// Refresh local
+await carregarContratacoesBanco();
+setTimeout(() => fecharScannerCheckin(), 1500);
+} catch(e){
+console.warn('registrar_checkin:', e);
+_mostrarResultadoScanner(false, e.message || 'Erro inesperado');
+}
+}
+function _mostrarResultadoScanner(ok, msg){
+const result = document.getElementById('scanner-result');
+const instr = document.getElementById('scanner-instr');
+if(instr) instr.style.display = 'none';
+if(!result) return;
+result.style.display = 'block';
+if(ok){
+result.style.background = 'rgba(34,197,94,.1)';
+result.style.color = '#065f46';
+result.style.border = '1px solid rgba(34,197,94,.3)';
+} else {
+result.style.background = 'rgba(239,68,68,.1)';
+result.style.color = '#991b1b';
+result.style.border = '1px solid rgba(239,68,68,.3)';
+}
+result.innerHTML = msg;
+}
+async function fecharScannerCheckin(){
+closeModal('modal-scanner-checkin');
+if(_scannerInstance){
+try { await _scannerInstance.stop(); _scannerInstance.clear(); } catch(_){}
+_scannerInstance = null;
+}
+_scannerContId = null;
 }
 function classificarPresencaSaiu(contId, vagaId, profId){
 _classCtx = { contId, vagaId, profId };
@@ -5715,7 +5876,7 @@ if(!CURRENT_USER || !CURRENT_PROFILE?.id) return;
 try {
 // Busca sem filtro duplo (evita 400); RLS garante que profissional vê só as suas
 const { data: todasCont, error } = await sb.from('contratacoes')
-.select('id, vaga_id, status, profissional_id');
+.select('id, vaga_id, status, profissional_id, checkin_em, checkout_em');
 if(error){ console.warn('carregarContratacoesBanco error:', error.message); }
 // Filtra client-side: só as do profissional logado e status confirmado
 const ativos = (todasCont||[]).filter(c =>
@@ -5883,7 +6044,27 @@ ${jaAvaliouEmp
 : `<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;width:100%;border:1px solid var(--border)" onclick="abrirAvaliacaoEmpresa('${c.id}','${empNome}')">⭐ Avaliar empresa</button>`
 }`;
 }
-return `<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="confirmarDesistirContratacao('${c.id}','${titulo}')">
+// Check-in / check-out (janela = 1h antes do início até término)
+const ini = vd?.data_evento ? new Date(vd.data_evento) : null;
+const fim = vd?.hora_termino ? new Date(vd.hora_termino) : null;
+const janelaIni = ini ? new Date(ini.getTime() - 3600000) : null;
+const dentroJanela = janelaIni && fim && new Date() >= janelaIni && new Date() <= fim;
+let checkinSection = '';
+if(dentroJanela){
+const ciEm = c.checkin_em ? new Date(c.checkin_em) : null;
+const coEm = c.checkout_em ? new Date(c.checkout_em) : null;
+const fmtH = (d) => d ? `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
+if(!ciEm){
+checkinSection = `<button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%;font-size:13px" onclick="abrirScannerCheckin('${c.id}')">📲 Fazer check-in</button>`;
+} else if(!coEm){
+checkinSection = `<div style="margin-top:10px;font-size:11px;color:var(--green);text-align:center;padding:7px;background:rgba(34,197,94,.1);border-radius:8px;font-weight:600">✓ Check-in às ${fmtH(ciEm)}</div>
+<button class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%;font-size:12px;border:1px solid var(--border)" onclick="abrirScannerCheckin('${c.id}')">📲 Fazer check-out</button>`;
+} else {
+checkinSection = `<div style="margin-top:10px;font-size:11px;color:var(--green);text-align:center;padding:7px;background:rgba(34,197,94,.1);border-radius:8px;font-weight:600">✓ Check-in ${fmtH(ciEm)} · Check-out ${fmtH(coEm)}</div>`;
+}
+}
+return `${checkinSection}
+<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="confirmarDesistirContratacao('${c.id}','${titulo}')">
 Desistir desta contratacao
 </button>`;
 })()}
@@ -7097,6 +7278,41 @@ async function enviarAvaliacaoEmpresa(){
 <div style="font-size:12px;color:#92400e;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px;margin-bottom:16px;line-height:1.5">⚠️ Isto vai gerar uma <b>falta automática</b> no histórico, com bloqueio temporário de 7 a 30 dias dependendo do histórico.</div>
 <button class="btn btn-danger btn-block" style="margin-bottom:10px" onclick="executarClassificacaoEstado('faltou','modal-confirmar-faltou')">Confirmar falta</button>
 <button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-confirmar-faltou')">Cancelar</button>
+</div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-qr-evento">
+<div class="modal" style="max-width:420px">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">QR de entrada</div>
+<button class="modal-close" onclick="fecharModalQR()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div id="qr-evt-info" style="text-align:center;margin-bottom:12px">
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:15px" id="qr-evt-nome">—</div>
+<div style="font-size:11px;color:var(--gray);margin-top:2px" id="qr-evt-janela">—</div>
+</div>
+<div id="qr-evt-canvas" style="display:flex;justify-content:center;align-items:center;background:#fff;padding:20px;border:2px solid var(--border);border-radius:14px;min-height:280px;margin-bottom:14px"></div>
+<div id="qr-evt-status" style="font-size:11px;color:var(--gray);text-align:center;margin-bottom:18px">Aponte a câmera dos profissionais para o QR ao chegarem e ao saírem.</div>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="fecharModalQR()">Fechar</button>
+</div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-scanner-checkin">
+<div class="modal" style="max-width:420px">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title" id="scanner-title">Fazer check-in</div>
+<button class="modal-close" onclick="fecharScannerCheckin()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div id="scanner-instr" style="font-size:12px;color:var(--gray);margin-bottom:10px;text-align:center">Aponte para o QR exibido pela empresa.</div>
+<div id="scanner-reader" style="background:#000;border-radius:12px;overflow:hidden;min-height:280px;margin-bottom:12px"></div>
+<div id="scanner-result" style="display:none;padding:12px;border-radius:10px;font-size:13px;text-align:center;margin-bottom:12px"></div>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="fecharScannerCheckin()">Cancelar</button>
 </div>
 </div>
 </div>
