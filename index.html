@@ -6072,10 +6072,14 @@ checkinSection = `<div style="margin-top:10px;font-size:11px;color:var(--green);
 checkinSection = `<div style="margin-top:10px;font-size:11px;color:var(--green);text-align:center;padding:7px;background:rgba(34,197,94,.1);border-radius:8px;font-weight:600">✓ Check-in ${fmtH(ciEm)} · Check-out ${fmtH(coEm)}</div>`;
 }
 }
-return `${checkinSection}
-<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="confirmarDesistirContratacao('${c.id}','${titulo}')">
-Desistir desta contratacao
-</button>`;
+// Botão Desistir: esconde se já fez check-in E evento já começou
+// (mantém visível em caso de check-in adiantado pré-evento, pra dar saída de emergência)
+const eventoJaComecou = ini && new Date() >= ini;
+const mostraDesistir = !c.checkin_em || !eventoJaComecou;
+const btnDesistir = mostraDesistir
+? `<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="confirmarDesistirContratacao('${c.id}','${titulo}')">Desistir desta contratacao</button>`
+: '';
+return `${checkinSection}${btnDesistir}`;
 })()}
 </div>
 </div>`;
