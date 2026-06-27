@@ -1388,21 +1388,6 @@ Conversar
 </div>
 </div>
 </div>
-<div class="modal-overlay" id="modal-contestar-falta">
-<div class="modal">
-<div class="modal-handle"></div>
-<div class="modal-head">
-<div class="modal-title">Contestar falta</div>
-<button class="modal-close" onclick="closeModal('modal-contestar-falta')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-</div>
-<div class="modal-body">
-<div style="font-size:13px;color:var(--gray);margin-bottom:12px">Explique o motivo da contestação. O caso será revisado manualmente.</div>
-<textarea id="contestar-motivo" rows="4" placeholder="Ex: Eu compareci ao evento no horário combinado..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:none;box-sizing:border-box;margin-bottom:14px"></textarea>
-<button class="btn btn-primary btn-block" id="btn-contestar-confirmar" style="margin-bottom:10px">Enviar contestação</button>
-<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-contestar-falta')">Cancelar</button>
-</div>
-</div>
-</div>
 <div class="modal-overlay" id="modal-registrar-falta">
 <div class="modal">
 <div class="modal-handle"></div>
@@ -1811,7 +1796,6 @@ let _countdownInterval   = null;
 let _checkinVagaId = null;
 let _checkinProfId = null;
 let _checkinNome   = null;
-let _contestarFaltaId = null;
 const VAGAS_POR_PAGINA = 20;
 let _vagasPaginaAtual = 0;
 let _vagasFiltradas   = [];
@@ -1852,7 +1836,7 @@ return `<div class="notif-item${n.lida?'':' notif-new'}" style="display:flex;gap
 <div style="flex:1">
 <div style="font-weight:700;font-size:13px;color:var(--navy)">${n.titulo}</div>
 ${mensagemLimpa?`<div style="font-size:12px;color:var(--gray);margin-top:3px;line-height:1.5">${mensagemLimpa}</div>`:''}
-${faltaId ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;padding:4px 10px;border:1px solid var(--border)" onclick="abrirModalContestarFalta('${faltaId}')">Contestar falta</button>` : ''}
+${faltaId ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;padding:4px 10px;border:1px solid var(--border)" onclick="abrirContestarFaltaPorId('${faltaId}')">Contestar falta</button>` : ''}
 <div style="font-size:11px;color:var(--border-dark,#aaa);margin-top:4px">${when}</div>
 </div>
 </div>`;
@@ -5095,6 +5079,20 @@ const show = isAdmin();
 if(linkProf) linkProf.style.display = show ? 'block' : 'none';
 if(linkEmp) linkEmp.style.display = show ? 'block' : 'none';
 }
+async function abrirContestarFaltaPorId(faltaId){
+// Wrapper: busca dados da falta e abre modal de contestação
+try {
+const { data, error } = await sb.from('faltas')
+.select('id, created_at, vagas(titulo, empresas(nome))')
+.eq('id', faltaId)
+.maybeSingle();
+if(error || !data){ showToast('Falta não encontrada'); return; }
+const dataF = new Date(data.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+const vagaT = data.vagas?.titulo || 'Vaga';
+const empN = data.vagas?.empresas?.nome || '—';
+abrirContestarFalta(faltaId, vagaT, empN, dataF);
+} catch(e){ console.warn('abrirContestarFaltaPorId:', e); showToast('Erro ao abrir contestação'); }
+}
 async function carregarFaltasProfDetalhado(){
 const lista = document.getElementById('lista-faltas-prof');
 if(!lista) return;
@@ -6752,33 +6750,6 @@ showToast(`Falta registrada. ${primeiroNome} bloqueado por ${dias} dias.`);
 }
 }
 _checkinVagaId = null; _checkinProfId = null; _checkinNome = null;
-}
-// ─── CONTESTAR FALTA ──────────────────────────────────────────
-function abrirModalContestarFalta(faltaId){
-_contestarFaltaId = faltaId;
-document.getElementById('contestar-motivo').value = '';
-document.getElementById('btn-contestar-confirmar').onclick = enviarContestacao;
-openModal('modal-contestar-falta');
-}
-async function enviarContestacao(){
-const motivo = document.getElementById('contestar-motivo').value.trim();
-if(!motivo){ showToast('Descreva o motivo antes de enviar.'); return; }
-if(!_contestarFaltaId){ closeModal('modal-contestar-falta'); return; }
-const btn = document.getElementById('btn-contestar-confirmar');
-btn.textContent = 'Enviando...'; btn.disabled = true;
-const { data, error } = await sb.rpc('contestar_falta', {
-p_falta_id: _contestarFaltaId,
-p_motivo:   motivo,
-});
-btn.textContent = 'Enviar contestação'; btn.disabled = false;
-if(error || !data?.ok){
-showToast('Erro ao enviar contestação.');
-console.warn('contestar_falta:', error?.message || data?.erro);
-return;
-}
-closeModal('modal-contestar-falta');
-showToast('Contestação enviada. Será revisada em breve.');
-_contestarFaltaId = null;
 }
 // ─── CPF ──────────────────────────────────────────────────────
 function mascaraCPF(input){
