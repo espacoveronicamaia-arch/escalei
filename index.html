@@ -4924,15 +4924,17 @@ const pad = n => String(n).padStart(2,'0');
 const fmtD = (d) => d.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
 janela.textContent = `${fmtD(ini)} · ${pad(ini.getHours())}:${pad(ini.getMinutes())}–${pad(fim.getHours())}:${pad(fim.getMinutes())}`;
 }
-await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+await _loadScript('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js');
 if(canvas){
 canvas.innerHTML = '';
-_qrInstance = new QRCode(canvas, {
-text: payload,
-width: 260, height: 260,
-colorDark: '#0F172A', colorLight: '#FFFFFF',
-correctLevel: QRCode.CorrectLevel.M
-});
+const qr = qrcode(0, 'M'); // typeNumber 0 = auto, errorCorrectionLevel 'M'
+qr.addData(payload);
+qr.make();
+// 6px por módulo: gera imagem ~ 200-260px dependendo do tamanho do payload
+canvas.innerHTML = qr.createImgTag(6, 0);
+const img = canvas.querySelector('img');
+if(img){ img.style.maxWidth = '260px'; img.style.height = 'auto'; img.style.display = 'block'; }
+_qrInstance = qr;
 }
 } catch(e){
 console.warn('abrirModalQR:', e);
@@ -4955,7 +4957,7 @@ if(result){ result.style.display = 'none'; result.innerHTML = ''; }
 if(titulo) titulo.textContent = 'Escanear QR';
 if(instr){ instr.style.display = 'block'; instr.textContent = 'Aponte para o QR exibido pela empresa.'; }
 try {
-await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.10/html5-qrcode.min.js');
+await _loadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
 if(_scannerInstance){ try { await _scannerInstance.stop(); } catch(_){} _scannerInstance = null; }
 _scannerInstance = new Html5Qrcode('scanner-reader');
 await _scannerInstance.start(
@@ -4968,10 +4970,17 @@ await _scannerInstance.start(
 console.warn('abrirScannerCheckin:', e);
 if(instr) instr.textContent = '';
 if(result){
+const msg = (e && e.message) ? e.message : '';
+let texto;
+if(msg.includes('Falha ao carregar')) texto = 'Não foi possível carregar a biblioteca de leitura. Verifique sua conexão e tente novamente.';
+else if(msg.includes('NotAllowedError') || msg.includes('Permission') || msg.includes('NotReadable')) texto = 'Câmera bloqueada. Toque no cadeado da URL → Permissões → Câmera → Permitir, e recarregue.';
+else if(msg.includes('NotFoundError') || msg.includes('no camera')) texto = 'Nenhuma câmera detectada neste dispositivo.';
+else texto = 'Erro ao iniciar scanner: ' + (msg || 'desconhecido');
 result.style.display = 'block';
 result.style.background = 'rgba(239,68,68,.1)';
 result.style.color = '#991b1b';
-result.innerHTML = 'Não foi possível acessar a câmera. Verifique as permissões no navegador.';
+result.style.border = '1px solid rgba(239,68,68,.3)';
+result.innerHTML = texto;
 }
 }
 }
