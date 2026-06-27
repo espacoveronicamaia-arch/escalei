@@ -648,7 +648,7 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 <div style="font-size:28px">💰</div>
 </div>
-<div id="banner-faltas-prof" style="display:none;margin:14px 20px 0;padding:11px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.1);font-size:12px;line-height:1.45;color:#374151"></div>
+<div id="banner-faltas-prof" style="display:none;margin:14px 20px 0;padding:11px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.1);font-size:12px;line-height:1.45;color:#374151;cursor:pointer" onclick="goTo('screen-faltas-prof')"></div>
 <div id="secao-contratacoes" style="display:none">
 <div class="sep"></div>
 <div class="sec-head">
@@ -867,6 +867,12 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 </div>
 </div>
+<div style="padding:0 20px 12px">
+<button class="btn btn-ghost btn-block" style="border:1px solid var(--border);font-size:13px" onclick="goTo('screen-faltas-prof')">📋 Histórico de faltas</button>
+</div>
+<div id="perfil-admin-link" style="display:none;padding:0 20px 12px">
+<button class="btn btn-ghost btn-block" style="border:1px solid var(--blue);color:var(--blue);font-size:13px;font-weight:700" onclick="goTo('screen-disputas-admin')">🛡️ Painel admin</button>
+</div>
 <div style="padding:0 20px 20px">
 <button class="btn btn-danger btn-block" onclick="doLogout()">Sair da conta</button>
 </div>
@@ -877,6 +883,27 @@ body{background:#D8E3F5;min-height:100vh}
 <button class="nav-item" onclick="goTo('screen-ranking')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></div>Ranking</button>
 <button class="nav-item" onclick="goTo('screen-chats')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>Chat</button>
 <button class="nav-item active" onclick="goTo('screen-perfil')"><div class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>Perfil</button>
+</div>
+</div>
+<div class="screen" id="screen-faltas-prof">
+<div class="topbar">
+<button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+<div class="sec-title" style="font-size:17px">Minhas faltas</div>
+<div></div>
+</div>
+<div class="scroll-content">
+<div style="padding:14px 20px 6px;font-size:11px;color:var(--gray);line-height:1.5">Faltas dos últimos 90 dias. Você pode contestar cada falta uma vez, em até 30 dias após o registro.</div>
+<div id="lista-faltas-prof" style="padding:8px 20px 24px"><div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div></div>
+</div>
+</div>
+<div class="screen" id="screen-disputas-admin">
+<div class="topbar">
+<button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+<div class="sec-title" style="font-size:17px">🛡️ Disputas pendentes</div>
+<div></div>
+</div>
+<div class="scroll-content">
+<div id="lista-disputas-admin" style="padding:14px 20px 24px"><div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div></div>
 </div>
 </div>
 <div class="screen" id="screen-notif">
@@ -1091,6 +1118,9 @@ body{background:#D8E3F5;min-height:100vh}
 <div id="emp-avaliacoes-lista"><div style="font-size:13px;color:var(--gray)">Carregando...</div></div>
 </div>
 <div style="height:8px"></div>
+<div id="perfil-admin-link-emp" style="display:none;padding:0 20px 12px">
+<button class="btn btn-ghost btn-block" style="border:1px solid var(--blue);color:var(--blue);font-size:13px;font-weight:700" onclick="goTo('screen-disputas-admin')">🛡️ Painel admin</button>
+</div>
 <div style="padding:0 20px 20px">
 <button class="btn btn-danger btn-block" onclick="doLogout()">Sair da conta</button>
 </div>
@@ -1841,6 +1871,9 @@ if(id === 'screen-chat'){ renderMensagens(); }
 if(id === 'screen-historico'){ renderHistorico(); }
 if(id === 'screen-perfil'){ renderConquistas(); renderRatingBars(); renderPlanoAtual(); carregarFotoPerfil(); }
 if(id === 'screen-notif' || id === 'screen-notif-emp') renderNotificacoesTela(id);
+if(id === 'screen-faltas-prof') carregarFaltasProfDetalhado();
+if(id === 'screen-disputas-admin') carregarDisputasPendentes();
+if(id === 'screen-perfil' || id === 'screen-perfil-emp') atualizarLinkAdminPerfil();
 }
 function goTo(id, isBack){
 // Re-render da MESMA tela (realtime, refresh): não mexe na pilha.
@@ -1910,6 +1943,8 @@ window.history.replaceState({}, '', _u);
 }, 0);
 // Usuário autenticado atual
 let CURRENT_USER = null;
+const ADMIN_EMAILS = ['escalei.adm@gmail.com'];
+function isAdmin(){ return CURRENT_USER && CURRENT_USER.email && ADMIN_EMAILS.includes(CURRENT_USER.email); }
 let CURRENT_PROFILE = null; // profissional ou empresa do banco
 function estaProfBloqueado(){
 if(!CURRENT_PROFILE) return null;
@@ -5051,6 +5086,172 @@ _scannerInstance = null;
 }
 _scannerContId = null;
 }
+let _faltaCtxContestar = null;
+let _disputaCtxJulgar = null;
+function atualizarLinkAdminPerfil(){
+const linkProf = document.getElementById('perfil-admin-link');
+const linkEmp = document.getElementById('perfil-admin-link-emp');
+const show = isAdmin();
+if(linkProf) linkProf.style.display = show ? 'block' : 'none';
+if(linkEmp) linkEmp.style.display = show ? 'block' : 'none';
+}
+async function carregarFaltasProfDetalhado(){
+const lista = document.getElementById('lista-faltas-prof');
+if(!lista) return;
+if(!CURRENT_PROFILE || loginType !== 'prof'){
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Disponível apenas para profissionais.</div>';
+return;
+}
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div>';
+try {
+const desde = new Date(Date.now() - 90*86400000).toISOString();
+const { data: faltas, error } = await sb.from('faltas')
+.select('id, vaga_id, created_at, revogada_em, motivo, vagas(titulo, data_evento, empresa_id, empresas(nome)), disputas_falta(id, status, motivo, parecer, created_at, resolvida_em)')
+.eq('profissional_id', CURRENT_PROFILE.id)
+.gte('created_at', desde)
+.order('created_at', { ascending: false });
+if(error){ console.warn('faltas prof:', error); lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Erro ao carregar faltas.</div>'; return; }
+if(!faltas || faltas.length === 0){
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px;line-height:1.6">🎉 Você não tem faltas nos últimos 90 dias.<br><span style="font-size:11px">Continue assim!</span></div>';
+return;
+}
+const escapeHtml = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escapeAttr = (s) => String(s||'').replace(/'/g,'').replace(/"/g,'');
+const html = faltas.map(f => {
+const dt = new Date(f.created_at);
+const dataF = dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+const vagaT = f.vagas?.titulo || 'Vaga';
+const empN = f.vagas?.empresas?.nome || '—';
+const dEvento = f.vagas?.data_evento ? new Date(f.vagas.data_evento).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
+const isRevogada = !!f.revogada_em;
+const disputas = (f.disputas_falta || []).slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+const disputaAtiva = disputas.find(d => d.status === 'pendente');
+const disputaJulgada = disputas.find(d => d.status !== 'pendente');
+const diasDesde = Math.floor((Date.now() - dt.getTime()) / 86400000);
+const prazoExpirou = diasDesde > 30;
+let badge = '';
+let acao = '';
+let extra = '';
+if(isRevogada){
+badge = '<span style="background:rgba(34,197,94,.12);color:var(--green);font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px">Revogada</span>';
+} else if(disputaAtiva){
+badge = '<span style="background:rgba(245,158,11,.12);color:#92400e;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px">Em análise</span>';
+extra = '<div style="margin-top:8px;font-size:11px;color:var(--gray);padding:8px;background:rgba(245,158,11,.06);border-radius:8px;line-height:1.5"><b>Sua contestação:</b> ' + escapeHtml(disputaAtiva.motivo) + '</div>';
+} else if(disputaJulgada){
+const cor = disputaJulgada.status === 'aceita' ? 'var(--green)' : 'var(--red)';
+const bg = disputaJulgada.status === 'aceita' ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.12)';
+badge = '<span style="background:' + bg + ';color:' + cor + ';font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px">' + (disputaJulgada.status === 'aceita' ? 'Disputa aceita' : 'Disputa rejeitada') + '</span>';
+extra = '<div style="margin-top:8px;font-size:11px;color:var(--gray);padding:8px;background:rgba(0,0,0,.03);border-radius:8px;line-height:1.5"><b>Sua contestação:</b> ' + escapeHtml(disputaJulgada.motivo) + (disputaJulgada.parecer ? '<br><b style="margin-top:4px;display:inline-block">Parecer:</b> ' + escapeHtml(disputaJulgada.parecer) : '') + '</div>';
+} else {
+badge = '<span style="background:rgba(239,68,68,.1);color:var(--red);font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px">Válida</span>';
+if(prazoExpirou){
+acao = '<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center;padding:7px;background:rgba(0,0,0,.03);border-radius:8px">Prazo para contestar expirou (30 dias)</div>';
+} else {
+acao = '<button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;font-size:12px;border:1px solid var(--border)" onclick="abrirContestarFalta(&quot;' + f.id + '&quot;,&quot;' + escapeAttr(vagaT) + '&quot;,&quot;' + escapeAttr(empN) + '&quot;,&quot;' + dataF + '&quot;)">Contestar esta falta</button>';
+}
+}
+return '<div class="card" style="margin-bottom:10px;border-left:3px solid ' + (isRevogada ? 'var(--green)' : (disputaAtiva ? 'rgba(245,158,11,.5)' : 'var(--red)')) + ';' + (isRevogada ? 'opacity:.78' : '') + '"><div class="card-pad"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;color:var(--navy)">' + escapeHtml(vagaT) + '</div><div style="font-size:11px;color:var(--gray);margin-top:2px">' + escapeHtml(empN) + (dEvento ? ' · evento em ' + dEvento : '') + '</div><div style="font-size:11px;color:var(--gray);margin-top:2px">Falta registrada em ' + dataF + '</div></div>' + badge + '</div>' + extra + acao + '</div></div>';
+}).join('');
+lista.innerHTML = html;
+} catch(e){ console.warn('carregarFaltasProfDetalhado:', e); lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Erro inesperado.</div>'; }
+}
+function abrirContestarFalta(faltaId, vagaTitulo, empresaNome, dataFalta){
+_faltaCtxContestar = { faltaId, vagaTitulo, empresaNome, dataFalta };
+const info = document.getElementById('contestar-info');
+if(info) info.innerHTML = '<b>Falta:</b> ' + vagaTitulo + '<br><b>Empresa:</b> ' + empresaNome + '<br><b>Registrada em:</b> ' + dataFalta;
+const ta = document.getElementById('contestar-motivo');
+if(ta) ta.value = '';
+openModal('modal-contestar-falta');
+}
+async function enviarContestacao(){
+if(!_faltaCtxContestar) return;
+const ta = document.getElementById('contestar-motivo');
+const motivo = ta ? ta.value.trim() : '';
+if(motivo.length < 10){ showToast('Explique em pelo menos 10 caracteres'); return; }
+if(motivo.length > 2000){ showToast('Motivo muito longo (máximo 2000)'); return; }
+const btn = document.getElementById('btn-enviar-contestacao');
+if(btn){ btn.disabled = true; btn.textContent = 'Enviando...'; }
+try {
+const { data, error } = await sb.rpc('criar_disputa_falta', {
+p_falta_id: _faltaCtxContestar.faltaId,
+p_motivo: motivo
+});
+if(error){ showToast('Erro: ' + (error.message || 'desconhecido')); console.warn(error); return; }
+if(!data?.ok){ showToast(data?.erro || 'Não foi possível enviar'); return; }
+closeModal('modal-contestar-falta');
+showToast('Contestação enviada — aguarde análise');
+_faltaCtxContestar = null;
+await carregarFaltasProfDetalhado();
+} finally {
+if(btn){ btn.disabled = false; btn.textContent = 'Enviar contestação'; }
+}
+}
+async function carregarDisputasPendentes(){
+const lista = document.getElementById('lista-disputas-admin');
+if(!lista) return;
+if(!isAdmin()){
+lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Acesso restrito.</div>';
+return;
+}
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div>';
+try {
+const { data, error } = await sb.from('disputas_falta')
+.select('id, motivo, created_at, status, faltas(id, vaga_id, created_at, profissionais(nome), vagas(titulo, data_evento, empresas(nome)))')
+.eq('status', 'pendente')
+.order('created_at', { ascending: true });
+if(error){ console.warn('disputas pendentes:', error); lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Erro ao carregar.</div>'; return; }
+if(!data || data.length === 0){
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px;line-height:1.6">📭 Nenhuma disputa pendente.<br><span style="font-size:11px">Quando profissionais contestarem faltas, elas aparecem aqui.</span></div>';
+return;
+}
+const escapeHtml = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escapeAttr = (s) => String(s||'').replace(/'/g,'').replace(/"/g,'');
+const html = data.map(d => {
+const dt = new Date(d.created_at);
+const dataDisputa = dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const profN = d.faltas?.profissionais?.nome || '—';
+const vagaT = d.faltas?.vagas?.titulo || 'Vaga';
+const empN = d.faltas?.vagas?.empresas?.nome || '—';
+const dEvento = d.faltas?.vagas?.data_evento ? new Date(d.faltas.vagas.data_evento).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '—';
+const dFalta = d.faltas?.created_at ? new Date(d.faltas.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '—';
+return '<div class="card" style="margin-bottom:12px;border-left:3px solid rgba(245,158,11,.5)"><div class="card-pad"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px"><div><div style="font-weight:700;font-size:14px;color:var(--navy)">' + escapeHtml(profN) + ' vs ' + escapeHtml(empN) + '</div><div style="font-size:11px;color:var(--gray);margin-top:2px">' + escapeHtml(vagaT) + ' · evento ' + dEvento + '</div><div style="font-size:11px;color:var(--gray);margin-top:2px">Falta em ' + dFalta + ' · disputa em ' + dataDisputa + '</div></div><span style="background:rgba(245,158,11,.12);color:#92400e;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;white-space:nowrap">PENDENTE</span></div><div style="margin-top:6px;font-size:12px;color:#374151;padding:10px;background:rgba(0,0,0,.03);border-radius:8px;line-height:1.5"><b>Motivo:</b><br>' + escapeHtml(d.motivo) + '</div><button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%;font-size:12px" onclick="abrirJulgarDisputa(&quot;' + d.id + '&quot;,&quot;' + escapeAttr(profN) + '&quot;,&quot;' + escapeAttr(empN) + '&quot;,&quot;' + escapeAttr(vagaT) + '&quot;)">Julgar →</button></div></div>';
+}).join('');
+lista.innerHTML = html;
+} catch(e){ console.warn('carregarDisputasPendentes:', e); lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Erro inesperado.</div>'; }
+}
+function abrirJulgarDisputa(disputaId, profN, empN, vagaT){
+_disputaCtxJulgar = { disputaId, profN, empN, vagaT };
+const ctx = document.getElementById('julgar-contexto');
+if(ctx) ctx.innerHTML = '<b>Profissional:</b> ' + profN + '<br><b>Empresa:</b> ' + empN + '<br><b>Vaga:</b> ' + vagaT;
+const ta = document.getElementById('julgar-parecer');
+if(ta) ta.value = '';
+openModal('modal-julgar-disputa');
+}
+async function julgarDisputa(aceitar){
+if(!_disputaCtxJulgar) return;
+const parecerEl = document.getElementById('julgar-parecer');
+const parecer = parecerEl ? parecerEl.value.trim() : '';
+const btnA = document.getElementById('btn-julgar-aceitar');
+const btnR = document.getElementById('btn-julgar-rejeitar');
+if(btnA) btnA.disabled = true;
+if(btnR) btnR.disabled = true;
+try {
+const { data, error } = await sb.rpc('julgar_disputa', {
+p_disputa_id: _disputaCtxJulgar.disputaId,
+p_aceitar: aceitar,
+p_parecer: parecer || null
+});
+if(error){ showToast('Erro: ' + (error.message || 'desconhecido')); console.warn(error); return; }
+if(!data?.ok){ showToast(data?.erro || 'Não foi possível julgar'); return; }
+closeModal('modal-julgar-disputa');
+showToast(aceitar ? 'Disputa aceita — falta revogada' : 'Disputa rejeitada');
+_disputaCtxJulgar = null;
+await carregarDisputasPendentes();
+} finally {
+if(btnA) btnA.disabled = false;
+if(btnR) btnR.disabled = false;
+}
+}
 function classificarPresencaSaiu(contId, vagaId, profId){
 _classCtx = { contId, vagaId, profId };
 openModal('modal-saiu-antes');
@@ -7261,6 +7462,48 @@ async function enviarAvaliacaoEmpresa(){
 </div>
 </div>
 </div>
+<div class="modal-overlay" id="modal-contestar-falta">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Contestar falta</div>
+<button class="modal-close" onclick="closeModal('modal-contestar-falta')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div id="contestar-info" style="font-size:12px;color:var(--gray);margin-bottom:12px;padding:10px;background:rgba(31,77,58,.04);border-radius:8px;line-height:1.5"></div>
+<div style="margin-bottom:10px">
+<span class="inp-label">Explique o que aconteceu *</span>
+<textarea class="inp" id="contestar-motivo" rows="6" placeholder="Conte os fatos: você estava presente? avisou com antecedência? havia emergência? Seja específico — a administração vai analisar." style="resize:vertical;min-height:120px"></textarea>
+<div style="font-size:10px;color:var(--gray);margin-top:4px">Mínimo 10 caracteres · Máximo 2000</div>
+</div>
+<div style="font-size:11px;color:#92400e;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.45">⚠️ Você pode contestar uma falta apenas uma vez. Se a disputa for rejeitada, a falta permanece.</div>
+<button class="btn btn-primary btn-block" id="btn-enviar-contestacao" style="margin-bottom:10px" onclick="enviarContestacao()">Enviar contestação</button>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-contestar-falta')">Cancelar</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="modal-julgar-disputa">
+<div class="modal">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">Julgar disputa</div>
+<button class="modal-close" onclick="closeModal('modal-julgar-disputa')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div id="julgar-contexto" style="font-size:12px;color:#374151;margin-bottom:14px;padding:12px;background:rgba(31,77,58,.04);border-radius:10px;line-height:1.55"></div>
+<div style="margin-bottom:14px">
+<span class="inp-label">Parecer (opcional)</span>
+<textarea class="inp" id="julgar-parecer" rows="3" placeholder="Sua decisão será notificada ao profissional. Se aceitar, a empresa também é notificada." style="resize:vertical;min-height:80px"></textarea>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:10px">
+<button class="btn btn-primary btn-sm" id="btn-julgar-aceitar" style="flex:1;background:var(--green);border-color:var(--green)" onclick="julgarDisputa(true)">✓ Aceitar</button>
+<button class="btn btn-danger btn-sm" id="btn-julgar-rejeitar" style="flex:1" onclick="julgarDisputa(false)">✗ Rejeitar</button>
+</div>
+<button class="btn btn-ghost btn-block" style="margin-bottom:24px" onclick="closeModal('modal-julgar-disputa')">Cancelar</button>
+</div>
+</div>
+</div>
+
 <div class="modal-overlay" id="modal-saiu-antes">
 <div class="modal">
 <div class="modal-handle"></div>
