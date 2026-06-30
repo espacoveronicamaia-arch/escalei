@@ -1874,6 +1874,10 @@ if(id === 'screen-perfil' || id === 'screen-perfil-emp') atualizarLinkAdminPerfi
 function goTo(id, isBack){
 // Re-render da MESMA tela (realtime, refresh): não mexe na pilha.
 if(id === currentScreen){ renderScreen(id); return; }
+// Cleanup: desativa realtime do evento ao sair da tela de detalhe
+if(currentScreen === 'screen-evento-detalhe' && id !== 'screen-evento-detalhe'){
+if(typeof desativarRealtimeEvento === 'function') desativarRealtimeEvento();
+}
 if(!isBack){
 if(NAV_ROOTS.includes(id)) navStack = [];          // âncora reseta a pilha
 else if(currentScreen) navStack.push(currentScreen); // empilha a tela que saímos
@@ -4540,6 +4544,7 @@ wrap.innerHTML = html || `<div class="empty-state" style="padding:32px 20px;text
 let EVENTO_ATIVO = null;
 let _evdInterval = null;
 let _classCtx = null;
+let _evdRealtimeChannel = null;
 function abrirEvento(evento_id){
 const grupos = agruparVagasPorEvento(Object.values(VAGAS).filter(Boolean));
 const g = grupos.find(x => (x.evento_id||('solo:'+x.funcoes[0]?.id)) === evento_id) || grupos.find(x => x.evento_id === evento_id);
@@ -4548,6 +4553,52 @@ EVENTO_ATIVO = g;
 EVENTO_ATIVO.contratacoes = null; // null = carregando
 goTo('screen-evento-detalhe');
 carregarContratacoesEvento();
+ativarRealtimeEvento();
+}
+function ativarRealtimeEvento(){
+if(!EVENTO_ATIVO || !CURRENT_PROFILE?.id || loginType !== 'emp') return;
+if(_evdRealtimeChannel) return; // já ativo
+const vagaIds = new Set(EVENTO_ATIVO.funcoes.map(v => v.id));
+const eventoKey = EVENTO_ATIVO.evento_id || ('solo:'+(EVENTO_ATIVO.funcoes[0]?.id || ''));
+_evdRealtimeChannel = sb.channel('evento-ao-vivo-' + eventoKey)
+.on('postgres_changes', {
+event: 'UPDATE',
+schema: 'public',
+table: 'contratacoes',
+filter: `empresa_id=eq.${CURRENT_PROFILE.id}`
+}, async payload => {
+if(!EVENTO_ATIVO) return;
+const novo = payload.new || {};
+const antigo = payload.old || {};
+if(!vagaIds.has(novo.vaga_id)) return; // mudança em outro evento
+if(novo.status !== 'confirmado') return; // só interessa confirmadas
+if(!EVENTO_ATIVO.contratacoes) EVENTO_ATIVO.contratacoes = [];
+let idx = EVENTO_ATIVO.contratacoes.findIndex(c => c.id === novo.id);
+let nome = '?';
+if(idx >= 0){
+const old = EVENTO_ATIVO.contratacoes[idx];
+EVENTO_ATIVO.contratacoes[idx] = { ...old, ...novo, profissionais: old.profissionais };
+nome = old.profissionais?.nome || '?';
+} else {
+const { data: prof } = await sb.from('profissionais').select('nome').eq('id', novo.profissional_id).maybeSingle();
+nome = prof?.nome || '?';
+EVENTO_ATIVO.contratacoes.push({ ...novo, profissionais: prof || { nome } });
+}
+// Detecta tipo de mudança para mostrar o toast certo
+if(!antigo.checkin_em && novo.checkin_em){
+showToast('🟢 ' + nome + ' fez check-in');
+} else if(!antigo.checkout_em && novo.checkout_em){
+showToast('🔵 ' + nome + ' fez check-out');
+}
+if(currentScreen === 'screen-evento-detalhe') renderEventoDetalhe();
+})
+.subscribe();
+}
+function desativarRealtimeEvento(){
+if(_evdRealtimeChannel){
+try { sb.removeChannel(_evdRealtimeChannel); } catch(_){}
+_evdRealtimeChannel = null;
+}
 }
 async function carregarContratacoesEvento(){
 const myEvento = EVENTO_ATIVO;
@@ -4600,12 +4651,12 @@ countdownHTML = `<div style="background:linear-gradient(135deg,var(--navy),#1a40
 countdownHTML = `<div style="background:linear-gradient(135deg,#059669,#10B981);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px">
 <div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.85;margin-bottom:6px">🟢 EM ANDAMENTO</div>
 <div id="evd-countdown" style="font-family:'Sora',sans-serif;font-weight:700;font-size:22px">Evento acontecendo agora</div>
-<div style="font-size:11px;opacity:.85;margin-top:4px">Em breve: check-in por QR code.</div>
+<div style="font-size:11px;opacity:.85;margin-top:4px">Acompanhe os check-ins abaixo conforme os profissionais escaneiam o QR.</div>
 </div>`;
 }
 const labelByState = { presente:'✓ Compareceu', saiu_autorizado:'↩ Saiu (autorizado)', saiu_desleixo:'⚠ Saiu (sem autorização)', faltou:'✗ Faltou' };
 const colorByState = { presente:'var(--green)', saiu_autorizado:'var(--gray)', saiu_desleixo:'var(--red)', faltou:'var(--red)' };
-const carregando = fase === 'fin' && EVENTO_ATIVO.contratacoes === null;
+const carregando = (fase === 'fin' || fase === 'vivo') && EVENTO_ATIVO.contratacoes === null;
 const renderFuncao = (v) => {
 const tot = v.totalVagas || 0;
 const cont = (v.contratados||[]).length;
@@ -4640,6 +4691,41 @@ ${cur ? `<div style="font-size:10px;color:${colorByState[cur]};font-weight:600;m
 ${btn('✓ Veio', '#10B981', `classificarPresenca('${c.id}','${c.vaga_id}','${c.profissional_id}','presente')`, sel('presente'))}
 ${btn('Saiu antes', '#F59E0B', `classificarPresencaSaiu('${c.id}','${c.vaga_id}','${c.profissional_id}')`, selSaiu)}
 ${btn('✗ Faltou', '#EF4444', `confirmarFaltou('${c.id}','${c.vaga_id}','${c.profissional_id}','${nomeEsc}')`, sel('faltou'))}
+</div>
+</div>`;
+}).join('');
+}
+}
+} else if(fase === 'vivo'){
+if(carregando){
+listaHTML = `<div style="padding:10px;color:var(--gray);font-size:12px;text-align:center">Carregando profissionais...</div>`;
+} else {
+const conts = (EVENTO_ATIVO.contratacoes||[]).filter(c => c.vaga_id === v.id);
+if(!conts.length){
+listaHTML = `<div style="padding:10px;color:var(--gray);font-size:12px;font-style:italic;text-align:center">Nenhum contratado</div>`;
+} else {
+listaHTML = conts.map(c => {
+const nome = c.profissionais?.nome || '?';
+const ckIn  = c.checkin_em  ? new Date(c.checkin_em)  : null;
+const ckOut = c.checkout_em ? new Date(c.checkout_em) : null;
+const hora = (d) => d ? d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+let statusBg, statusBorder, statusDot, statusLabel, statusColor;
+if(ckOut){
+statusBg = 'rgba(59,158,255,.06)'; statusBorder = 'rgba(59,158,255,.30)';
+statusDot = '#3B9EFF'; statusLabel = `Saiu às ${hora(ckOut)}`; statusColor = '#2563EB';
+} else if(ckIn){
+statusBg = 'rgba(16,185,129,.06)'; statusBorder = 'rgba(16,185,129,.30)';
+statusDot = '#10B981'; statusLabel = `Chegou às ${hora(ckIn)}`; statusColor = '#059669';
+} else {
+statusBg = '#fff'; statusBorder = 'var(--border)';
+statusDot = '#D1D5DB'; statusLabel = 'Aguardando chegada'; statusColor = 'var(--gray)';
+}
+return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${statusBg};border:1px solid ${statusBorder};border-radius:10px;margin-bottom:6px">
+<div style="width:9px;height:9px;border-radius:50%;background:${statusDot};flex-shrink:0;box-shadow:0 0 0 3px ${statusDot}22"></div>
+<div class="avatar-btn" style="width:30px;height:30px;font-size:11px;background:linear-gradient(135deg,#3B9EFF,#2563EB);flex-shrink:0">${nome.slice(0,2).toUpperCase()}</div>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:13px">${nome}</div>
+<div style="font-size:11px;color:${statusColor};font-weight:600;margin-top:1px">${statusLabel}</div>
 </div>
 </div>`;
 }).join('');
