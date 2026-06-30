@@ -1803,6 +1803,7 @@ let starRating = 0;
 // ─── VARIÁVEIS DE ESTADO (declaradas aqui para evitar "before initialization") ──
 let _realtimeProfChannel = null;
 let _realtimeEmpChannel  = null;
+let _notifRealtimeChannel = null;
 let _realtimeChannel     = null;
 let _countdownInterval   = null;
 let _checkinVagaId = null;
@@ -2133,6 +2134,7 @@ await processarConvitePendente();
 await processarPerfilNaUrl();
 // ── Realtime: notifica profissional ao vivo sobre contratações ──
 ativarRealtimeProf();
+ativarRealtimeNotificacoes();
 } else {
 let data = null;
 try {
@@ -2183,6 +2185,7 @@ renderRankingEmp('Garçom'); renderTopProfEmp('Garçom'); renderCandidatos(); re
 renderStatsEmpresa();
 // ── Realtime: notifica empresa ao vivo sobre novos eventos ──
 ativarRealtimeEmpresa();
+ativarRealtimeNotificacoes();
 }
 const nomeToast = loginType === 'emp' ? (CURRENT_PROFILE?.nome || nome) : nome;
 showToast(`Bem-vindo(a), ${nomeToast.split(' ')[0]}!`);
@@ -2371,11 +2374,13 @@ CURRENT_PROFILE.cpf = cpfMeta;
 try { await sb.removeAllChannels(); } catch(e){}
 _realtimeProfChannel = null;
 _realtimeChannel     = null;
+_notifRealtimeChannel = null;
 if(loginType === 'prof'){
 ativarRealtimeProf();
 } else if(loginType === 'emp'){
 ativarRealtimeEmpresa();
 }
+ativarRealtimeNotificacoes();
 }
 if(event === 'SIGNED_OUT'){
 CURRENT_USER    = null;
@@ -2393,6 +2398,7 @@ Object.keys(RANKINGS).forEach(k => RANKINGS[k] = []);
 try { await sb.removeAllChannels(); } catch(e){}
 _realtimeProfChannel = null;
 _realtimeEmpChannel  = null;
+_notifRealtimeChannel = null;
 await sb.auth.signOut();
 CURRENT_USER = null;
 CURRENT_PROFILE = null;
@@ -6689,6 +6695,42 @@ async function abrirNotificacoes(){
 // Navega para a tela de notificações (profissional ou empresa)
 const tela = loginType === 'emp' ? 'screen-notif-emp' : 'screen-notif';
 goTo(tela);
+}
+function ativarRealtimeNotificacoes(){
+if(!CURRENT_USER?.id) return;
+if(_notifRealtimeChannel) return; // já ativo
+_notifRealtimeChannel = sb.channel('notif-' + CURRENT_USER.id)
+.on('postgres_changes', {
+event: 'INSERT',
+schema: 'public',
+table: 'notificacoes',
+filter: `usuario_id=eq.${CURRENT_USER.id}`
+}, payload => {
+const n = payload.new;
+if(!n) return;
+// Evita duplicar se já está no array (defensivo)
+if(NOTIFICACOES.some(x => x.id === n.id)) return;
+// Adiciona no início da lista
+NOTIFICACOES.unshift({
+id: n.id,
+titulo: n.titulo,
+mensagem: n.mensagem,
+icone: n.icone,
+lida: n.lida || false,
+created_at: n.created_at
+});
+// Atualiza o badge nos sinos
+renderNotifBell();
+// Se a tela de notificações estiver aberta, re-renderiza
+if(currentScreen === 'screen-notif' || currentScreen === 'screen-notif-emp'){
+renderNotificacoesTela(currentScreen);
+}
+// Toast com preview
+const ic = n.icone || '🔔';
+const tit = n.titulo || 'Nova notificação';
+showToast(ic + ' ' + tit);
+})
+.subscribe();
 }
 function ativarRealtimeProf(){
 if(!CURRENT_PROFILE?.id) return;
