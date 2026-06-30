@@ -317,6 +317,10 @@ border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);
 cursor:pointer;background:transparent;white-space:nowrap;transition:all .15s;
 }
 .rank-tab.active{background:var(--blue-mid);border-color:var(--blue-mid);color:white}
+.rank-view-tabs{display:flex;gap:4px;margin-top:14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.rank-view-tab{background:transparent;border:none;color:rgba(255,255,255,.45);font-family:'Sora',sans-serif;font-weight:700;font-size:13px;padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;display:flex;align-items:center;gap:6px}
+.rank-view-tab:hover{color:rgba(255,255,255,.75)}
+.rank-view-tab.active{color:white;border-bottom-color:var(--blue-mid)}
 .rank-item{
 display:flex;align-items:center;gap:14px;padding:14px 20px;
 border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;
@@ -742,6 +746,10 @@ body{background:#D8E3F5;min-height:100vh}
 </div>
 <span class="badge badge-blue" style="background:rgba(59,158,255,.15);color:var(--accent);border-color:rgba(59,158,255,.3)"><span style="display:inline-flex;align-items:center;gap:4px;color:#EF4444"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display:inline;vertical-align:middle"><circle cx="12" cy="12" r="12"/></svg></span> Ao vivo</span>
 </div>
+<div class="rank-view-tabs">
+<button class="rank-view-tab active" data-view="prof" onclick="setRankView('prof')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profissionais</button>
+<button class="rank-view-tab" data-view="emp" onclick="setRankView('emp')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> Empresas</button>
+</div>
 <div class="rank-tabs">
 <button class="rank-tab active" onclick="setRankTab('Garçom',this)">Garçom</button>
 <button class="rank-tab" onclick="setRankTab('Bartender',this)">Bartender</button>
@@ -1057,6 +1065,10 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="rank-sub">Contrate pelos melhores · por mérito real</div>
 </div>
 <span class="badge badge-blue" style="background:rgba(59,158,255,.15);color:var(--accent);border-color:rgba(59,158,255,.3)"><span style="display:inline-flex;align-items:center;gap:4px;color:#EF4444"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display:inline;vertical-align:middle"><circle cx="12" cy="12" r="12"/></svg></span> Ao vivo</span>
+</div>
+<div class="rank-view-tabs">
+<button class="rank-view-tab active" data-view="prof" onclick="setRankView('prof')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profissionais</button>
+<button class="rank-view-tab" data-view="emp" onclick="setRankView('emp')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> Empresas</button>
 </div>
 <div class="rank-tabs">
 <button class="rank-tab active" onclick="setRankTab('Garçom',this)">Garçom</button>
@@ -2096,6 +2108,7 @@ await carregarHistoricoBanco();
 await carregarFaltasBanco();
 await carregarVagasBanco();
 await carregarRankingBanco();
+await carregarRankingEmpresas();
 await carregarAvaliacoesPendentes();
 await carregarContratacoesBanco();
 await carregarNotificacoesBanco();
@@ -2144,6 +2157,8 @@ document.querySelectorAll('.avatar-btn').forEach(b => b.textContent = nomeEmp.sp
 await carregarVagasEmpresaBanco();
 await carregarFaltasBanco();
 await carregarRankingBanco();
+await carregarRankingEmpresas();
+await carregarNotaEmpresa();
 await carregarNotificacoesBanco();
 goTo('screen-home-emp');
 // Carrega contratacao_ids que a empresa ja avaliou
@@ -2773,11 +2788,106 @@ return `<div class="rank-item" style="${p.nota<3?'opacity:.5':''};cursor:pointer
 }).join('');
 }
 function setRankTab(cat, btn){
+RANK_FUNC_ATUAL = cat;
 document.querySelectorAll('.rank-tab').forEach(b=>b.classList.remove('active'));
-btn.classList.add('active');
+if(btn) btn.classList.add('active');
 // Dados já estão em RANKINGS (carregados no login) — só re-renderiza
 renderRanking(cat);
 renderRankingEmp(cat);
+}
+// ─── RANKING DE EMPRESAS ──────────────────────────────────────
+let RANK_VIEW_ATUAL = 'prof';        // 'prof' ou 'emp'
+let RANKING_EMPRESAS = [];           // cache do ranking de empresas
+let RANK_FUNC_ATUAL = 'Garçom';      // função selecionada nas abas
+async function carregarRankingEmpresas(){
+try {
+const { data, error } = await sb
+.from('empresas_ranking')
+.select('empresa_id, nome, tipo_estabelecimento, nota_media, total_avaliacoes, total_contratacoes, atividade_90d, score_ranking, membro_desde')
+.limit(50);
+if(error){ console.warn('carregarRankingEmpresas:', error.message); return; }
+RANKING_EMPRESAS = data || [];
+if(RANK_VIEW_ATUAL === 'emp') renderRankingEmpresas();
+} catch(err){
+console.error('carregarRankingEmpresas erro:', err);
+}
+}
+function renderRankingEmpresas(){
+const ids = ['rank-list', 'rank-list-emp'];
+const html = !RANKING_EMPRESAS.length
+? '<div style="padding:32px 16px;text-align:center;color:var(--gray);font-size:13px">Nenhuma empresa avaliada ainda.</div>'
+: RANKING_EMPRESAS.map((e, i) => {
+const pos = i+1;
+const cls = pos===1?'n1':pos===2?'n2':pos===3?'n3':'nX';
+const cor = (typeof RANK_CORES !== 'undefined' && RANK_CORES.length) ? RANK_CORES[i % RANK_CORES.length] : '#3B9EFF';
+const av = (e.nome || '?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+const nota = parseFloat(e.nota_media || 0).toFixed(1);
+const score = parseFloat(e.score_ranking || 0).toFixed(2);
+const isMe = e.empresa_id === (CURRENT_PROFILE?.id);
+const meMark = isMe ? ' <span class="badge badge-blue" style="font-size:9px;padding:2px 7px">Você</span>' : '';
+const topBadge = (pos<=3 && parseFloat(score)>=3.5) ? ' <span class="badge" style="font-size:9px;padding:2px 7px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-left:4px">🏆 Top</span>' : '';
+const tipo = e.tipo_estabelecimento || 'Empresa';
+return `<div class="rank-item" style="${parseFloat(nota)<3 && e.total_avaliacoes>0 ? 'opacity:.55' : ''}">
+<div class="rank-num ${cls}">${pos}</div>
+<div class="rank-avatar" style="background:${cor}">${av}</div>
+<div class="rank-info">
+<div class="rank-nome">${e.nome || 'Empresa'}${meMark}${topBadge}</div>
+<div class="rank-fn">${tipo} · score ${score}</div>
+</div>
+<div class="rank-right">
+<div class="rank-nota">${parseFloat(nota)>0 ? nota + ' ★' : '—'}</div>
+<div class="rank-ev">${e.total_avaliacoes || 0} aval.</div>
+</div>
+</div>`;
+}).join('');
+ids.forEach(id => {
+const el = document.getElementById(id);
+if(el) el.innerHTML = html;
+});
+}
+function setRankView(view){
+RANK_VIEW_ATUAL = view;
+// Atualiza botões master (em ambas telas)
+document.querySelectorAll('.rank-view-tab').forEach(b => {
+b.classList.toggle('active', b.dataset.view === view);
+});
+// Mostra/esconde abas de função
+document.querySelectorAll('.rank-tabs').forEach(t => {
+t.style.display = view === 'prof' ? 'flex' : 'none';
+});
+// Atualiza subtítulo
+document.querySelectorAll('.rank-sub').forEach(s => {
+s.textContent = view === 'prof'
+? 'Atualizado em tempo real · por mérito'
+: 'Empresas avaliadas pelos profissionais';
+});
+// Renderiza a lista correta
+if(view === 'prof'){
+renderRanking(RANK_FUNC_ATUAL);
+renderRankingEmp(RANK_FUNC_ATUAL);
+} else {
+if(!RANKING_EMPRESAS.length) carregarRankingEmpresas();
+else renderRankingEmpresas();
+}
+}
+async function carregarNotaEmpresa(){
+if(!CURRENT_PROFILE?.id || loginType !== 'emp') return;
+try {
+const { data } = await sb
+.from('empresas_ranking')
+.select('nota_media, total_avaliacoes, total_contratacoes, score_ranking')
+.eq('empresa_id', CURRENT_PROFILE.id)
+.maybeSingle();
+if(!data) return;
+CURRENT_PROFILE.nota_media = data.nota_media;
+CURRENT_PROFILE.score_ranking = data.score_ranking;
+const elNota = document.getElementById('emp-perfil-nota');
+const elEv   = document.getElementById('emp-perfil-eventos');
+const elCt   = document.getElementById('emp-perfil-contratos');
+if(elNota) elNota.textContent = parseFloat(data.nota_media)>0 ? parseFloat(data.nota_media).toFixed(1) : '—';
+if(elEv)   elEv.textContent   = data.total_contratacoes || 0;
+if(elCt)   elCt.textContent   = data.total_avaliacoes || 0;
+} catch(e){ console.warn('carregarNotaEmpresa:', e.message); }
 }
 // ─── CANDIDATOS ───────────────────────────────────────
 let vagaCandidatosAtiva = 'v1'; // ID da vaga que a empresa está visualizando
