@@ -2837,7 +2837,7 @@ const isMe = e.empresa_id === (CURRENT_PROFILE?.id);
 const meMark = isMe ? ' <span class="badge badge-blue" style="font-size:9px;padding:2px 7px">Você</span>' : '';
 const topBadge = (pos<=3 && parseFloat(score)>=3.5) ? ' <span class="badge" style="font-size:9px;padding:2px 7px;background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);margin-left:4px">🏆 Top</span>' : '';
 const tipo = e.tipo_estabelecimento || 'Empresa';
-return `<div class="rank-item" style="${parseFloat(nota)<3 && e.total_avaliacoes>0 ? 'opacity:.55' : ''}">
+return `<div class="rank-item" data-emp-id="${e.empresa_id||''}" onclick="if(this.dataset.empId)abrirPerfilPublicoEmpresa(this.dataset.empId)" style="cursor:pointer;${parseFloat(nota)<3 && e.total_avaliacoes>0 ? 'opacity:.55' : ''}">
 <div class="rank-num ${cls}">${pos}</div>
 <div class="rank-avatar" style="background:${cor}">${av}</div>
 <div class="rank-info">
@@ -4659,6 +4659,15 @@ countdownHTML = `<div style="background:linear-gradient(135deg,#059669,#10B981);
 <div id="evd-countdown" style="font-family:'Sora',sans-serif;font-weight:700;font-size:22px">Evento acontecendo agora</div>
 <div style="font-size:11px;opacity:.85;margin-top:4px">Acompanhe os check-ins abaixo conforme os profissionais escaneiam o QR.</div>
 </div>`;
+} else if(fase === 'fin'){
+countdownHTML = `<div style="background:linear-gradient(135deg,#1F2937,#374151);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
+<div style="flex:1;min-width:0">
+<div style="font-size:10px;font-weight:700;letter-spacing:1px;opacity:.7;margin-bottom:4px">⚫ FINALIZADO</div>
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:16px">Veja o relatório completo</div>
+<div style="font-size:11px;opacity:.75;margin-top:2px">Presença, pagamento e avaliações pendentes</div>
+</div>
+<button class="btn btn-primary btn-sm" style="background:#fff;color:#1F2937;font-weight:700;padding:8px 14px;flex-shrink:0" onclick="abrirRelatorioEvento()">📊 Ver</button>
+</div>`;
 }
 const labelByState = { presente:'✓ Compareceu', saiu_autorizado:'↩ Saiu (autorizado)', saiu_desleixo:'⚠ Saiu (sem autorização)', faltou:'✗ Faltou' };
 const colorByState = { presente:'var(--green)', saiu_autorizado:'var(--gray)', saiu_desleixo:'var(--red)', faltou:'var(--red)' };
@@ -4773,6 +4782,106 @@ el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${St
 tick();
 _evdInterval = setInterval(tick, 1000);
 }
+}
+// ─── RELATÓRIO DO EVENTO (fase 'fin') ──────────────────
+function _relatorioValorVaga(v){
+if(v.valor !== undefined && v.valor !== null) return parseFloat(v.valor) || 0;
+if(v.val !== undefined){
+if(typeof v.val === 'number') return v.val;
+return parseFloat(String(v.val).replace(/[^\d.,]/g,'').replace(',','.')) || 0;
+}
+return 0;
+}
+function abrirRelatorioEvento(){
+if(!EVENTO_ATIVO){ showToast('Evento não carregado'); return; }
+const g = EVENTO_ATIVO;
+const body = document.getElementById('relatorio-body');
+if(!body) return;
+const conts = (g.contratacoes||[]).filter(c => c.status === 'confirmado');
+const fmtBRL = (n) => n.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:2});
+const fmtData = g.inicio ? g.inicio.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'}) : '—';
+const local = g.funcoes[0]?.local || '—';
+const veio = ['presente','saiu_autorizado'];
+let nPresentes = 0, nTotal = conts.length, totalPagar = 0;
+const pendentesAvaliacao = [];
+conts.forEach(c => {
+if(veio.includes(c.presenca)){
+nPresentes++;
+const vaga = g.funcoes.find(v => v.id === c.vaga_id);
+totalPagar += vaga ? _relatorioValorVaga(vaga) : 0;
+if(!AVALIACOES_EMP_FEITAS.has(c.id)){
+pendentesAvaliacao.push({ contId: c.id, vagaId: c.vaga_id, profId: c.profissional_id });
+}
+}
+});
+const taxaPct = nTotal>0 ? Math.round((nPresentes/nTotal)*100) : 0;
+const labelStatus = { presente:'Compareceu', saiu_autorizado:'Saiu autorizado', saiu_desleixo:'Saiu sem autorização', faltou:'Faltou' };
+const iconStatus  = { presente:'✅', saiu_autorizado:'↩️', saiu_desleixo:'⚠️', faltou:'❌' };
+const corStatus   = { presente:'#059669', saiu_autorizado:'#6B7280', saiu_desleixo:'#DC2626', faltou:'#DC2626' };
+const cardsHTML = g.funcoes.map(v => {
+const fn = v.fn || v.title || 'Função';
+const valor = _relatorioValorVaga(v);
+const contsV = conts.filter(c => c.vaga_id === v.id);
+const nContV = contsV.length;
+const nPresV = contsV.filter(c => veio.includes(c.presenca)).length;
+const jan = typeof vagaNoJaneladeAvaliacao==='function' ? vagaNoJaneladeAvaliacao(v) : true;
+const linhas = contsV.map(c => {
+const nome = c.profissionais?.nome || '?';
+const pres = c.presenca || 'faltou';
+const veio_ok = veio.includes(pres);
+const ic = iconStatus[pres] || '•';
+const cor = corStatus[pres] || 'var(--gray)';
+const label = labelStatus[pres] || pres;
+const valorTxt = veio_ok ? `R$ ${fmtBRL(valor)}` : '—';
+const jaAvaliou = AVALIACOES_EMP_FEITAS.has(c.id);
+let acao = '';
+if(veio_ok){
+if(jaAvaliou){
+acao = `<span style="font-size:10px;color:#059669;font-weight:700">✓ Avaliado</span>`;
+} else if(jan){
+acao = `<button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:10px" onclick="closeModal('modal-relatorio-evento');abrirModalAvaliar('${v.id}','${c.id}','profissional','${c.profissional_id}')">⭐ Avaliar</button>`;
+}
+}
+return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border);font-size:12px">
+<span style="font-size:15px;flex-shrink:0">${ic}</span>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;${veio_ok?'':'text-decoration:line-through;color:var(--gray)'}">${nome}</div>
+<div style="font-size:10px;color:${cor};font-weight:600;margin-top:1px">${label}</div>
+</div>
+<div style="font-weight:700;font-size:12px;color:${veio_ok?'#059669':'var(--gray)'};min-width:70px;text-align:right">${valorTxt}</div>
+${acao ? `<div style="flex-shrink:0">${acao}</div>` : ''}
+</div>`;
+}).join('') || `<div style="padding:10px 0;font-size:11px;color:var(--gray);font-style:italic;text-align:center">Sem contratados</div>`;
+return `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:13px">${fn}</div>
+<div style="font-size:11px;color:var(--gray);font-weight:600">R$ ${fmtBRL(valor)} cada · ${nPresV}/${nContV}</div>
+</div>
+${linhas}
+</div>`;
+}).join('');
+let ctaHTML = '';
+if(pendentesAvaliacao.length){
+const p = pendentesAvaliacao[0];
+ctaHTML = `<button class="btn btn-primary btn-block" style="margin-top:14px" onclick="closeModal('modal-relatorio-evento');abrirModalAvaliar('${p.vagaId}','${p.contId}','profissional','${p.profId}')">⭐ Avaliar ${pendentesAvaliacao.length} pendente${pendentesAvaliacao.length>1?'s':''}</button>`;
+}
+body.innerHTML = `<div style="text-align:center;padding:4px 0 14px">
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:17px;line-height:1.25">${g.nome||'Evento'}</div>
+<div style="font-size:11px;color:var(--gray);margin-top:4px">${fmtData} · ${local}</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:12px;text-align:center">
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:#059669;line-height:1">${nPresentes}<span style="font-size:14px;opacity:.6">/${nTotal}</span></div>
+<div style="font-size:9px;color:var(--gray);font-weight:700;letter-spacing:.7px;margin-top:6px">COMPARECERAM${nTotal>0?` (${taxaPct}%)`:''}</div>
+</div>
+<div style="background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.25);border-radius:12px;padding:12px;text-align:center">
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:#2563EB;line-height:1">R$ ${fmtBRL(totalPagar)}</div>
+<div style="font-size:9px;color:var(--gray);font-weight:700;letter-spacing:.7px;margin-top:6px">TOTAL A PAGAR</div>
+</div>
+</div>
+${cardsHTML}
+${ctaHTML}`;
+openModal('modal-relatorio-evento');
 }
 let _novoEventoFuncoes = [];
 function toggleChipFuncao(el){
@@ -6196,11 +6305,7 @@ if(!vagaId || !VAGAS[vagaId]) return;
 await carregarVagasEmpresaBanco();
 renderCandidatos();
 renderEmpVagasHome();
-addNotificacaoEmp(
-'Novo candidato!',
-`Alguém se candidatou a uma das suas vagas.`,
-'candidatura'
-);
+notificar('Novo candidato!', 'Alguém se candidatou a uma das suas vagas.', '👤');
 })
 // Profissional contratado (via candidatura — aplicou e aceitou)
 .on('postgres_changes', {
@@ -6212,7 +6317,7 @@ if(payload.new?.status === 'contratado'){
 await carregarVagasEmpresaBanco();
 renderCandidatos();
 renderEmpVagasHome();
-addNotifEmp('Aceite recebido!', 'Um profissional confirmou participação!', '✅');
+notificar('Aceite recebido!', 'Um profissional confirmou participação!', '✅');
 showToast('✅ Profissional confirmou presença!');
 }
 })
@@ -6226,7 +6331,7 @@ if(payload.new?.status === 'confirmado'){
 await carregarVagasEmpresaBanco();
 renderCandidatos();
 renderEmpVagasHome();
-addNotifEmp('Aceite recebido!', 'Um profissional confirmou participação!', '✅');
+notificar('Aceite recebido!', 'Um profissional confirmou participação!', '✅');
 showToast('✅ Profissional confirmou presença!');
 }
 })
@@ -6327,7 +6432,7 @@ if(tituloEl) tituloEl.textContent = nConvites> 0 ? `📩 Minhas contratações (
 // ── Card de próximo evento com contagem regressiva ──────────
 const agora = new Date();
 const proximoEvento = CONTRATACOES_PROF
-.filter(c => c.status === 'confirmado' && c.vagaDetalhes?.data_evento)
+.filter(c => c.status === 'confirmado' && c.vagaDetalhes?.data_evento && !c.checkout_em)
 .map(c => ({ ...c, _inicio: new Date(c.vagaDetalhes.data_evento), _fim: new Date(c.vagaDetalhes.hora_termino) }))
 .filter(c => c._fim > agora) // Mostra countdown para qualquer evento que ainda não terminou
 .sort((a,b) => a._inicio - b._inicio)[0] || null; // Ordena por início mais próximo
@@ -6359,9 +6464,9 @@ countdownHTML = `
 // Inicia contagem regressiva
 const alvo = atrasado ? proximoEvento._fim : (emAndamento ? proximoEvento._fim : proximoEvento._inicio);
 function atualizarContagem(){
-// Revalida: se o evento mudou de status ou foi encerrado, para
+// Revalida: se o evento mudou de status, foi encerrado ou o profissional fez check-out, para
 const eventoAtualizado = CONTRATACOES_PROF.find(c => c.id === proximoEvento.id);
-if(!eventoAtualizado || eventoAtualizado.status !== 'confirmado'){
+if(!eventoAtualizado || eventoAtualizado.status !== 'confirmado' || eventoAtualizado.checkout_em){
 clearInterval(_countdownInterval);
 _countdownInterval = null;
 renderContratacoesProfHome();
@@ -6696,6 +6801,23 @@ async function abrirNotificacoes(){
 const tela = loginType === 'emp' ? 'screen-notif-emp' : 'screen-notif';
 goTo(tela);
 }
+// ─── NOTIFICAR (persiste no banco via RPC) ─────────────
+// IDs de notificações criadas pelo próprio cliente (para pular toast duplicado)
+const LOCAL_NOTIF_IDS = new Set();
+async function notificar(titulo, mensagem, icone='🔔'){
+if(!CURRENT_USER?.id) return null;
+try {
+const { data, error } = await sb.rpc('inserir_notificacao', {
+p_usuario_id: CURRENT_USER.id,
+p_titulo: titulo || '',
+p_mensagem: mensagem || '',
+p_icone: icone || '🔔'
+});
+if(error){ console.warn('notificar:', error.message); return null; }
+if(data) LOCAL_NOTIF_IDS.add(data);
+return data;
+} catch(e){ console.warn('notificar:', e.message); return null; }
+}
 function ativarRealtimeNotificacoes(){
 if(!CURRENT_USER?.id) return;
 if(_notifRealtimeChannel) return; // já ativo
@@ -6725,10 +6847,14 @@ renderNotifBell();
 if(currentScreen === 'screen-notif' || currentScreen === 'screen-notif-emp'){
 renderNotificacoesTela(currentScreen);
 }
-// Toast com preview
+// Toast com preview — só se não foi criada localmente (evita duplicar com showToast contextual)
+if(LOCAL_NOTIF_IDS.has(n.id)){
+LOCAL_NOTIF_IDS.delete(n.id);
+} else {
 const ic = n.icone || '🔔';
 const tit = n.titulo || 'Nova notificação';
 showToast(ic + ' ' + tit);
+}
 })
 .subscribe();
 }
@@ -6745,7 +6871,7 @@ if(payload.new?.status === 'convite'){
 const { data: vagaInfo } = await sb.from('vagas').select('id, titulo').eq('id', payload.new.vaga_id).maybeSingle();
 const titulo = vagaInfo?.titulo || 'um evento';
 showToast(`📩 Uma empresa quer te contratar para "${titulo}"!`);
-addNotifProf('Convite recebido!', `Você recebeu um convite para "${titulo}". Aceite ou recuse em Minhas contratações.`, '📩');
+notificar('Convite recebido', `Você recebeu um convite para "${titulo}". Aceite ou recuse em Minhas contratações.`, '📩');
 await carregarContratacoesBanco();
 }
 })
@@ -6758,7 +6884,7 @@ if(payload.new?.status === 'cancelado'){
 const { data: vagaInfo } = await sb.from('vagas').select('id, titulo').eq('id', payload.new.vaga_id).maybeSingle();
 const titulo = vagaInfo?.titulo || 'o evento';
 showToast(`❌ A empresa cancelou "${titulo}". Você está disponível novamente.`);
-addNotifProf('Evento cancelado', `A empresa cancelou o evento "${titulo}". Você está disponível para outras vagas.`, '❌');
+notificar('Evento cancelado', `A empresa cancelou o evento "${titulo}". Você está disponível para outras vagas.`, '❌');
 // Atualiza local: remove da seção Minhas Contratações
 CONTRATACOES_PROF = CONTRATACOES_PROF.filter(c => c.id !== payload.new.id);
 renderContratacoesProfHome();
@@ -6781,17 +6907,53 @@ if(status === 'contratado'){
 await carregarVagasBanco();
 await carregarHistoricoBanco();
 showToast('🎉 Você foi contratado(a)!');
-addNotifProf('Contratado(a)!', 'Uma empresa confirmou sua participação.', '🎉');
+notificar('Contratado(a)!', 'Uma empresa confirmou sua participação.', '🎉');
 await carregarContratacoesBanco();
 } else if(status === 'rejeitado'){
 await carregarVagasBanco();
-addNotifProf('Candidatura recusada', 'A empresa escolheu outro profissional.', '📋');
+notificar('Candidatura recusada', 'A empresa escolheu outro profissional.', '📋');
 }
 })
 .subscribe(status => {
 if(status === 'SUBSCRIBED'){
 }
 });
+// ── Canal para mudanças no próprio perfil (bloqueio/banimento) ──
+if(CURRENT_PROFILE?.id){
+sb.channel('prof-status-' + CURRENT_PROFILE.id)
+.on('postgres_changes', {
+event: 'UPDATE',
+schema: 'public',
+table: 'profissionais',
+filter: `id=eq.${CURRENT_PROFILE.id}`
+}, async payload => {
+const novo = payload.new || {};
+const antigo = payload.old || {};
+const antesBloqueado = antigo.bloqueado_ate && new Date(antigo.bloqueado_ate) > new Date();
+const agoraBloqueado = novo.bloqueado_ate && new Date(novo.bloqueado_ate) > new Date();
+const antesBanido = antigo.banido === true;
+const agoraBanido = novo.banido === true;
+// Atualiza objeto local
+CURRENT_PROFILE.bloqueado_ate = novo.bloqueado_ate;
+CURRENT_PROFILE.banido = novo.banido;
+CURRENT_PROFILE.total_faltas = novo.total_faltas;
+// Detecta transição e mostra toast
+if(!antesBanido && agoraBanido){
+showToast('🚫 Sua conta foi banida permanentemente.');
+} else if(antesBanido && !agoraBanido){
+showToast('✅ Sua conta foi reativada!');
+} else if(!antesBloqueado && agoraBloqueado){
+const dias = Math.max(1, Math.ceil((new Date(novo.bloqueado_ate) - new Date()) / 86400000));
+showToast(`⚠️ Você foi bloqueado por ${dias} dia${dias>1?'s':''}.`);
+} else if(antesBloqueado && !agoraBloqueado){
+showToast('✅ Você foi desbloqueado! Pode se candidatar novamente.');
+}
+// Atualiza UI
+await atualizarBannerFaltas();
+if(currentScreen === 'screen-home-prof') renderHomeVagas();
+})
+.subscribe();
+}
 }
 function addNotifProf(titulo, desc, icone){
 const badge = document.getElementById('notif-badge');
@@ -7275,6 +7437,52 @@ async function abrirPerfilPublico(profissionalId){
     const avsEl = document.getElementById('perfil-pub-avaliacoes');
     if(avsEl){ avsEl.innerHTML = (!avs||!avs.length) ? '<div style="font-size:13px;color:var(--gray)">Sem avaliações ainda.</div>' : avs.map(a=>'<div style="padding:12px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-family:Sora,sans-serif;font-weight:700;font-size:14px;color:var(--navy)">'+parseFloat(a.nota).toFixed(1)+' ★</div><div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})+'</div></div>'+(a.comentario?'<div style="font-size:13px;color:var(--gray);line-height:1.5">"'+a.comentario+'"</div>':'')+'</div>').join(''); }
   } catch(e){ console.warn('abrirPerfilPublico:', e.message); }
+}
+// ─── PERFIL PÚBLICO DE EMPRESA ────────────────────────────
+async function abrirPerfilPublicoEmpresa(empresaId){
+  if(!empresaId) return;
+  _perfilPublicoId = null; // não compartilha empresa via link (por enquanto)
+  goTo('screen-perfil-publico');
+  const contentEl = document.getElementById('perfil-publico-content');
+  if(contentEl) contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--gray);font-size:13px">Carregando...</div>';
+  try {
+    // Busca empresa + agregados do ranking em paralelo
+    const [empRes, rkRes, avsRes] = await Promise.all([
+      sb.from('empresas').select('id,nome,tipo_estabelecimento,fundadora,created_at').eq('id', empresaId).maybeSingle(),
+      sb.from('empresas_ranking').select('nota_media,total_avaliacoes,total_contratacoes,score_ranking,atividade_90d').eq('empresa_id', empresaId).maybeSingle(),
+      sb.from('avaliacoes_empresa_visiveis').select('nota,comentario,created_at').eq('empresa_id', empresaId).order('created_at',{ascending:false}).limit(5)
+    ]);
+    const emp = empRes.data;
+    if(!emp){ if(contentEl) contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--gray)">Empresa não encontrada.</div>'; return; }
+    const rk = rkRes.data || {};
+    const avs = avsRes.data || [];
+    const nota = rk.nota_media && parseFloat(rk.nota_media)>0 ? parseFloat(rk.nota_media).toFixed(1) : null;
+    const totalAv = rk.total_avaliacoes || 0;
+    const totalCont = rk.total_contratacoes || 0;
+    const score = rk.score_ranking ? parseFloat(rk.score_ranking).toFixed(2) : null;
+    const ativ90 = rk.atividade_90d || 0;
+    const tipo = emp.tipo_estabelecimento || 'Empresa';
+    const membroDesde = emp.created_at ? new Date(emp.created_at).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}) : '—';
+    const iniciais = (emp.nome||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    const fundadora = emp.fundadora ? '<div style="font-size:11px;color:var(--gray);margin-top:4px">Fundadora: '+emp.fundadora+'</div>' : '';
+    if(!contentEl) return;
+    contentEl.innerHTML = '<div class="perfil-header" style="padding-bottom:20px">'
+      +'<div class="perfil-avatar-wrap" style="pointer-events:none"><div class="perfil-avatar" style="background:linear-gradient(135deg,#3B9EFF,#2563EB)"><span style="font-size:28px;font-weight:800;color:white;font-family:Sora,sans-serif">'+iniciais+'</span></div></div>'
+      +'<div class="perfil-nome">'+emp.nome+'</div>'
+      +'<div class="perfil-fn">'+tipo+' · Membro desde '+membroDesde+'</div>'
+      +fundadora
+      +'</div>'
+      +'<div class="perfil-stats-row">'
+        +'<div class="stat-pill"><div class="stat-val">'+(nota??'—')+(nota?' ★':'')+'</div><div class="stat-lbl">Nota geral</div></div>'
+        +'<div class="stat-pill"><div class="stat-val">'+totalCont+'</div><div class="stat-lbl">Contratações</div></div>'
+        +'<div class="stat-pill"><div class="stat-val">'+totalAv+'</div><div class="stat-lbl">Avaliações</div></div>'
+      +'</div>'
+      +'<div class="sep"></div>'
+      +(score ? '<div style="padding:16px 20px"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Score no ranking</div><div style="display:flex;align-items:center;gap:12px"><div style="font-family:Sora,sans-serif;font-weight:800;font-size:28px;color:#2563EB">'+score+'</div><div style="flex:1;font-size:12px;color:var(--gray);line-height:1.45">Pontuação ponderada por nota, volume de avaliações, atividade e recência.</div></div>'+(ativ90>0?'<div style="margin-top:8px;font-size:11px;color:#059669;font-weight:600">🔥 '+ativ90+' evento'+(ativ90>1?'s':'')+' nos últimos 90 dias</div>':'')+'</div><div class="sep"></div>':'')
+      +'<div style="padding:16px 20px 0"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Avaliações de profissionais</div><div id="perfil-pub-avaliacoes">'
+      +((!avs||!avs.length) ? '<div style="font-size:13px;color:var(--gray)">Sem avaliações públicas ainda.</div>' : avs.map(a=>'<div style="padding:12px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-family:Sora,sans-serif;font-weight:700;font-size:14px;color:var(--navy)">'+parseFloat(a.nota).toFixed(1)+' ★</div><div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('pt-BR',{month:'short',year:'numeric'})+'</div></div>'+(a.comentario?'<div style="font-size:13px;color:var(--gray);line-height:1.5">"'+a.comentario+'"</div>':'')+'</div>').join(''))
+      +'</div></div><div style="height:32px"></div>';
+  } catch(e){ console.warn('abrirPerfilPublicoEmpresa:', e.message); }
 }
 function compartilharMeuPerfil(){ if(!CURRENT_PROFILE?.id) return; _perfilPublicoId = CURRENT_PROFILE.id; compartilharPerfil(); }
 function compartilharPerfil(){ if(!_perfilPublicoId) return; const url = window.location.origin+window.location.pathname+'?perfil='+_perfilPublicoId; try{ navigator.clipboard.writeText(url); showToast('🔗 Link do perfil copiado!'); }catch(e){ prompt('Copie o link do perfil:', url); } }
