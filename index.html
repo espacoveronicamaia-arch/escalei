@@ -2729,7 +2729,7 @@ try {
 // ordenados por nota_media desc, total_eventos desc
 const { data, error } = await sb
 .from('profissionais')
-.select('id, usuario_id, nome, funcoes, nota_media, eventos_total, presenca_pct, rank_geral')
+.select('id, usuario_id, nome, funcoes, nota_media, eventos_total, presenca_pct, rank_geral, nota_curriculo')
 // MVP: mostra todos os profissionais com funções, independente de eventos ou aprovação
 // Quando o piloto ganhar volume, reativar: .eq('aprovado', true).gt('eventos_total', 0)
 .not('funcoes', 'eq', '{}')
@@ -2764,7 +2764,7 @@ const av    = nome.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase() |
 funcoes.forEach(fn => {
 if(!RANKINGS[fn]) RANKINGS[fn] = [];
 RANKINGS[fn].push({ nome, nota, ev, fn, bg: cor, av, me: isMe,
-profissional_id: prof.id });
+profissional_id: prof.id, notaCurriculo: parseFloat(prof.nota_curriculo || 0) });
 });
 // Atualiza posição do usuário logado no PROF
 if(isMe){
@@ -2821,11 +2821,14 @@ const pos = i+1;
 const cls = pos===1?'n1':pos===2?'n2':pos===3?'n3':'nX';
 const crown = '';
 const meMark = p.me?' <span class="badge badge-blue" style="font-size:9px;padding:2px 7px">Você</span>':'';
+const novoBadge = (p.ev < 3 && p.notaCurriculo > 0)
+? ` <span class="badge" style="font-size:9px;padding:2px 6px;background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.25);margin-left:4px">🆕 IA ${p.notaCurriculo.toFixed(1)}</span>`
+: '';
 return `<div class="rank-item" style="${p.nota<3?'opacity:.5':''}">
 <div class="rank-num ${cls}">${pos}</div>
 <div class="rank-avatar" style="background:${p.bg}">${p.av}</div>
 <div class="rank-info">
-<div class="rank-nome">${p.nome}${meMark}</div>
+<div class="rank-nome">${p.nome}${meMark}${novoBadge}</div>
 <div class="rank-fn">${p.fn}</div>
 </div>
 <div class="rank-right">
@@ -2843,11 +2846,14 @@ if(!data.length){ list.innerHTML = '<div style="padding:32px 16px;text-align:cen
 list.innerHTML = data.map((p,i)=>{
 const pos = i+1;
 const cls = pos===1?'n1':pos===2?'n2':pos===3?'n3':'nX';
+const novoBadge = (p.ev < 3 && p.notaCurriculo > 0)
+? ` <span class="badge" style="font-size:9px;padding:2px 6px;background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.25);margin-left:4px">🆕 IA ${p.notaCurriculo.toFixed(1)}</span>`
+: '';
 return `<div class="rank-item" style="${p.nota<3?'opacity:.5':''};cursor:pointer" data-prof-id="${p.profissional_id||''}" onclick="if(this.dataset.profId)abrirPerfilPublico(this.dataset.profId)">
 <div class="rank-num ${cls}">${pos}</div>
 <div class="rank-avatar" style="background:${p.bg}">${p.av}</div>
 <div class="rank-info">
-<div class="rank-nome">${p.nome}</div>
+<div class="rank-nome">${p.nome}${novoBadge}</div>
 <div class="rank-fn">${p.fn}</div>
 </div>
 <div class="rank-right">
@@ -7716,16 +7722,31 @@ async function abrirPerfilPublico(profissionalId){
   const contentEl = document.getElementById('perfil-publico-content');
   if(contentEl) contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--gray);font-size:13px">Carregando...</div>';
   try {
-    const { data: prof } = await sb.from('profissionais').select('id,nome,funcoes,nota_media,foto_url,referencia_verificada,eventos_total').eq('id', profissionalId).maybeSingle();
+    const { data: prof } = await sb.from('profissionais').select('id,nome,funcoes,nota_media,foto_url,referencia_verificada,eventos_total,nota_curriculo,analise_curriculo_json').eq('id', profissionalId).maybeSingle();
     if(!prof){ if(contentEl) contentEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--gray)">Perfil não encontrado.</div>'; return; }
-    // Busca eventos e nota diretamente do banco (não depende do RANKINGS local)
     const eventos = prof.eventos_total || 0;
     const nota = prof.nota_media ? parseFloat(prof.nota_media).toFixed(1) : null;
+    const notaIA = prof.nota_curriculo ? parseFloat(prof.nota_curriculo).toFixed(1) : null;
+    const isNovo = eventos < 3 && notaIA;
     let titulo = eventos>=50?'Lenda':eventos>=20?'Veterano':eventos>=10?'Experiente':eventos>=5?'Novato':'Iniciante';
     const fns = Array.isArray(prof.funcoes) ? prof.funcoes : [];
     const iniciais = prof.nome.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
     if(!contentEl) return;
-    contentEl.innerHTML = '<div class="perfil-header" style="padding-bottom:20px"><div class="perfil-avatar-wrap" style="pointer-events:none"><div class="perfil-avatar" style="overflow:hidden;position:relative">' + (prof.foto_url ? '<img src="'+prof.foto_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;top:0;left:0"/>' : '<span style="font-size:28px;font-weight:800;color:white;font-family:Sora,sans-serif">'+iniciais+'</span>') + '</div></div><div class="perfil-nome">'+prof.nome+'</div><div class="perfil-fn">'+(fns.length?fns.join(' · '):'—')+'</div>'+(prof.referencia_verificada?'<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:4px">✓ Referência verificada</div>':'')+'</div><div class="perfil-stats-row"><div class="stat-pill"><div class="stat-val">'+(nota??'—')+'</div><div class="stat-lbl">Nota geral</div></div><div class="stat-pill"><div class="stat-val">'+eventos+'</div><div class="stat-lbl">Eventos</div></div><div class="stat-pill"><div class="stat-val">'+titulo+'</div><div class="stat-lbl">Título</div></div></div><div class="sep"></div>'+(fns.length?'<div style="padding:16px 20px"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Funções</div><div style="display:flex;flex-wrap:wrap;gap:8px">'+fns.map(f=>'<span class="badge badge-blue" style="font-size:12px;padding:5px 12px">'+f+'</span>').join('')+'</div></div><div class="sep"></div>':'')+'<div style="padding:16px 20px 0"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Avaliações recentes</div><div id="perfil-pub-avaliacoes"><div style="font-size:13px;color:var(--gray)">Carregando...</div></div></div><div style="height:32px"></div>';
+    // Bloco destacado "Novo no app" — só se tem análise de IA e menos de 3 eventos reais
+    const blocoNovoNoApp = isNovo ? `
+      <div style="margin:0 20px 4px;padding:14px 16px;border-radius:12px;background:rgba(59,158,255,.06);border:1px solid rgba(59,158,255,.2)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-family:Sora,sans-serif;font-weight:700;font-size:13px;color:var(--navy);display:flex;align-items:center;gap:6px">🆕 Novo no app</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px;line-height:1.4">Análise provisória do cadastro. Substituída pela reputação real conforme trabalha.</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:Sora,sans-serif;font-weight:800;font-size:26px;color:var(--accent);line-height:1">${notaIA}</div>
+            <div style="font-size:9px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin-top:2px">IA · CADASTRO</div>
+          </div>
+        </div>
+      </div>` : '';
+    contentEl.innerHTML = '<div class="perfil-header" style="padding-bottom:20px"><div class="perfil-avatar-wrap" style="pointer-events:none"><div class="perfil-avatar" style="overflow:hidden;position:relative">' + (prof.foto_url ? '<img src="'+prof.foto_url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;position:absolute;top:0;left:0"/>' : '<span style="font-size:28px;font-weight:800;color:white;font-family:Sora,sans-serif">'+iniciais+'</span>') + '</div></div><div class="perfil-nome">'+prof.nome+'</div><div class="perfil-fn">'+(fns.length?fns.join(' · '):'—')+'</div>'+(prof.referencia_verificada?'<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:4px">✓ Referência verificada</div>':'')+'</div>' + blocoNovoNoApp + '<div class="perfil-stats-row"><div class="stat-pill"><div class="stat-val">'+(nota??'—')+'</div><div class="stat-lbl">Nota geral</div></div><div class="stat-pill"><div class="stat-val">'+eventos+'</div><div class="stat-lbl">Eventos</div></div><div class="stat-pill"><div class="stat-val">'+titulo+'</div><div class="stat-lbl">Título</div></div></div><div class="sep"></div>'+(fns.length?'<div style="padding:16px 20px"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Funções</div><div style="display:flex;flex-wrap:wrap;gap:8px">'+fns.map(f=>'<span class="badge badge-blue" style="font-size:12px;padding:5px 12px">'+f+'</span>').join('')+'</div></div><div class="sep"></div>':'')+'<div style="padding:16px 20px 0"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:10px">Avaliações recentes</div><div id="perfil-pub-avaliacoes"><div style="font-size:13px;color:var(--gray)">Carregando...</div></div></div><div style="height:32px"></div>';
     const { data: avs } = await sb.from('avaliacoes')
       .select('nota,comentario,created_at')
       .eq('avaliado_id', profissionalId)
