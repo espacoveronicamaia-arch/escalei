@@ -5638,8 +5638,9 @@ return;
 lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div>';
 try {
 const { data, error } = await sb.from('profissionais')
-.select('id, nome, cpf, funcoes, experiencia_texto, locais_trabalhados, referencia_nome, referencia_telefone, nota_curriculo, selo_curriculo, analise_curriculo_json, analise_curriculo_em, aprovado, created_at')
+.select('id, nome, cpf, funcoes, experiencia_texto, locais_trabalhados, referencia_nome, referencia_telefone, nota_curriculo, selo_curriculo, analise_curriculo_json, analise_curriculo_em, aprovado, created_at, reprovado_em')
 .eq('aprovado', false)
+.is('reprovado_em', null)
 .order('created_at', { ascending: false });
 if(error){ lista.innerHTML = `<div style="text-align:center;color:var(--red);font-size:12px;padding:40px 20px">Erro: ${error.message}</div>`; return; }
 if(!data || !data.length){
@@ -5725,8 +5726,9 @@ if(!isAdmin()){ showToast('Acesso restrito'); return; }
 if(!confirm('Aprovar este profissional? Ele passará a aparecer nas buscas de empresas.')) return;
 if(btn){ btn.disabled = true; btn.textContent = '...'; }
 try {
-const { error } = await sb.from('profissionais').update({ aprovado: true }).eq('id', profId);
+const { data, error } = await sb.rpc('aprovar_profissional', { p_prof_id: profId });
 if(error){ showToast('Erro: ' + error.message); return; }
+if(!data?.ok){ showToast('Erro: ' + (data?.erro||'falha ao aprovar')); return; }
 showToast('✅ Profissional aprovado');
 await carregarProfsPendentes();
 } catch(e){
@@ -5741,10 +5743,9 @@ const motivo = prompt('Motivo da reprovação (opcional, só admin verá):');
 if(motivo === null) return; // cancelou
 if(btn){ btn.disabled = true; btn.textContent = '...'; }
 try {
-// Marca como reprovado guardando o motivo dentro do analise_curriculo_json
-const { data: atual } = await sb.from('profissionais').select('analise_curriculo_json').eq('id', profId).maybeSingle();
-const novoJson = { ...(atual?.analise_curriculo_json||{}), reprovado_em: new Date().toISOString(), motivo_reprovacao: motivo };
-await sb.from('profissionais').update({ aprovado: false, analise_curriculo_json: novoJson }).eq('id', profId);
+const { data, error } = await sb.rpc('reprovar_profissional', { p_prof_id: profId, p_motivo: motivo || '' });
+if(error){ showToast('Erro: ' + error.message); return; }
+if(!data?.ok){ showToast('Erro: ' + (data?.erro||'falha ao reprovar')); return; }
 showToast('✕ Profissional reprovado');
 await carregarProfsPendentes();
 } catch(e){
