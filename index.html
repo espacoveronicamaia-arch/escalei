@@ -568,6 +568,9 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="onb-dot active" id="onb-dot-0"></div>
 <div class="onb-dot" id="onb-dot-1"></div>
 <div class="onb-dot" id="onb-dot-2"></div>
+<div class="onb-dot" id="onb-dot-3"></div>
+<div class="onb-dot" id="onb-dot-4"></div>
+<div class="onb-dot" id="onb-dot-5"></div>
 </div>
 <div class="onb-slide" id="onb-slide-0" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:32px 28px;text-align:center">
 <div style="font-size:64px;margin-bottom:24px">👋</div>
@@ -606,15 +609,54 @@ body{background:#D8E3F5;min-height:100vh}
 <button class="btn btn-ghost btn-block" style="font-size:13px;color:rgba(255,255,255,.4)" onclick="onbProximo()">Pular por agora</button>
 </div>
 </div>
-<div class="onb-slide" id="onb-slide-2" style="display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:32px 28px;text-align:center">
-<div style="font-size:64px;margin-bottom:24px">🚀</div>
-<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:24px;color:white;margin-bottom:12px">Tudo pronto!</div>
-<div style="font-size:14px;color:rgba(255,255,255,.65);line-height:1.8;margin-bottom:32px">Seu perfil está configurado. Agora é só se candidatar às vagas e construir sua história no Escalei.</div>
-<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:20px;width:100%;margin-bottom:32px">
-<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:4px">💡 Dica</div>
-<div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.6">Complete seu perfil com uma foto e currículo para se destacar no ranking.</div>
+<div class="onb-slide" id="onb-slide-2" style="display:none;flex-direction:column;flex:1;padding:32px 28px">
+<div style="font-size:48px;text-align:center;margin-bottom:20px">💬</div>
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:white;text-align:center;margin-bottom:8px">Nos conta sua experiência</div>
+<div style="font-size:13px;color:rgba(255,255,255,.6);text-align:center;margin-bottom:20px">Anos, tipo de evento, o que você domina. Sem formalidade — conta como se fosse pra um amigo.</div>
+<textarea id="onb-experiencia" placeholder="Ex: Sou garçom há 4 anos. Trabalhei em casamentos, coquetéis corporativos e formaturas. Sei serviço à francesa e inglesa. Fiz curso de bartender no SENAC..." style="width:100%;min-height:150px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px;color:white;font-size:13px;line-height:1.5;font-family:inherit;resize:vertical" oninput="onbCharCount('experiencia', this)"></textarea>
+<div id="onb-experiencia-count" style="font-size:11px;color:rgba(255,255,255,.4);text-align:right;margin-top:6px">0 / 50 caracteres mínimos</div>
+<div style="margin-top:auto;padding-top:20px">
+<button class="btn btn-primary btn-block" style="font-size:15px;padding:14px" id="onb-btn-exp" onclick="onbSalvarExperiencia()" disabled>Continuar →</button>
 </div>
-<button class="btn btn-primary btn-block" style="font-size:15px;padding:14px" onclick="onbConcluir()">Ver vagas disponíveis →</button>
+</div>
+<div class="onb-slide" id="onb-slide-3" style="display:none;flex-direction:column;flex:1;padding:32px 28px">
+<div style="font-size:48px;text-align:center;margin-bottom:20px">🏢</div>
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:white;text-align:center;margin-bottom:8px">Onde você já trabalhou?</div>
+<div style="font-size:13px;color:rgba(255,255,255,.6);text-align:center;margin-bottom:20px">Buffets, restaurantes, empresas de evento. Pode listar os principais.</div>
+<textarea id="onb-locais" placeholder="Ex: Buffet Real, Casa Grande Eventos, Restaurante Xapuri, Copacabana Buffet" style="width:100%;min-height:100px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px;color:white;font-size:13px;line-height:1.5;font-family:inherit;resize:vertical" oninput="onbCharCount('locais', this)"></textarea>
+<div id="onb-locais-count" style="font-size:11px;color:rgba(255,255,255,.4);text-align:right;margin-top:6px">0 / 10 caracteres mínimos</div>
+<div style="margin-top:auto;padding-top:20px">
+<button class="btn btn-primary btn-block" style="font-size:15px;padding:14px" id="onb-btn-loc" onclick="onbSalvarLocais()" disabled>Continuar →</button>
+</div>
+</div>
+<div class="onb-slide" id="onb-slide-4" style="display:none;flex-direction:column;flex:1;padding:32px 28px">
+<div style="font-size:48px;text-align:center;margin-bottom:20px">📞</div>
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:white;text-align:center;margin-bottom:8px">Alguém que te indica</div>
+<div style="font-size:13px;color:rgba(255,255,255,.6);text-align:center;margin-bottom:20px">Nome e telefone de alguém que já trabalhou com você — colega de brigada, dono de buffet, cliente que atendeu. Se precisarmos validar, ligamos.</div>
+<div style="width:100%;margin-bottom:14px">
+<div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.5px;margin-bottom:6px">NOME DA REFERÊNCIA</div>
+<input type="text" id="onb-ref-nome" placeholder="Ex: Ana Paula Souza" oninput="onbValidarReferencia()" style="width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px;color:white;font-size:14px;font-family:inherit">
+</div>
+<div style="width:100%">
+<div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.5px;margin-bottom:6px">TELEFONE (COM DDD)</div>
+<input type="tel" id="onb-ref-telefone" placeholder="Ex: 34999887766" maxlength="11" oninput="onbValidarReferencia()" style="width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px;color:white;font-size:14px;font-family:inherit">
+</div>
+<div style="margin-top:auto;padding-top:20px">
+<button class="btn btn-primary btn-block" style="font-size:15px;padding:14px" id="onb-btn-ref" onclick="onbSalvarReferencia()" disabled>Finalizar cadastro →</button>
+</div>
+</div>
+<div class="onb-slide" id="onb-slide-5" style="display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:32px 28px;text-align:center">
+<div style="font-size:64px;margin-bottom:24px">🔍</div>
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:24px;color:white;margin-bottom:12px">Cadastro em análise</div>
+<div style="font-size:14px;color:rgba(255,255,255,.65);line-height:1.8;margin-bottom:32px">Nosso time revisa cada cadastro antes de você aparecer para as empresas. Isso mantém o marketplace confiável para todo mundo.</div>
+<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:20px;width:100%;margin-bottom:32px;text-align:left">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+<div style="font-size:18px">⏱️</div>
+<div style="font-size:13px;font-weight:700;color:white">Prazo de análise: até 24h</div>
+</div>
+<div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.5">Você receberá uma notificação assim que for aprovado. Enquanto isso, pode explorar o app.</div>
+</div>
+<button class="btn btn-primary btn-block" style="font-size:15px;padding:14px" onclick="onbConcluir()">Entrar no Escalei →</button>
 </div>
 </div>
 </div>
@@ -653,6 +695,13 @@ body{background:#D8E3F5;min-height:100vh}
 <div style="font-size:28px">💰</div>
 </div>
 <div id="banner-faltas-prof" style="display:none;margin:14px 20px 0;padding:11px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.1);font-size:12px;line-height:1.45;color:#374151;cursor:pointer" onclick="goTo('screen-faltas-prof')"></div>
+<div id="banner-perfil-incompleto-prof" style="display:none;margin:14px 20px 0;padding:12px 14px;border-radius:10px;border:1px solid rgba(59,158,255,.3);background:rgba(59,158,255,.08);font-size:12px;line-height:1.45;color:#374151;cursor:pointer" onclick="abrirCompletarPerfil()">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="font-size:20px">📝</div>
+<div style="flex:1"><div style="font-weight:700;color:#1F2937">Complete seu perfil</div><div style="font-size:11px;color:#6B7280;margin-top:2px">Preencha experiência, locais e referência para aparecer no ranking</div></div>
+<div style="font-size:18px;color:#3B9EFF">→</div>
+</div>
+</div>
 <div id="secao-contratacoes" style="display:none">
 <div class="sep"></div>
 <div class="sec-head">
@@ -2104,7 +2153,7 @@ if(!data){
 // Primeiro login após confirmação de e-mail — cria o perfil agora
 const nomeMeta = meta.nome || nome;
 try { await sb.from('usuarios').upsert({id:CURRENT_USER.id,email:CURRENT_USER.email,nome:nomeMeta,tipo:'profissional',ativo:true,telefone:CURRENT_USER.user_metadata?.telefone||null},{onConflict:'id'}); } catch(e){ console.warn('auto-create usuarios:',e.message); }
-try { await sb.from('profissionais').upsert({usuario_id:CURRENT_USER.id,nome:nomeMeta,funcoes:[],aprovado:true},{onConflict:'usuario_id'}); } catch(e){ console.warn('auto-create prof:',e.message); }
+try { await sb.from('profissionais').upsert({usuario_id:CURRENT_USER.id,nome:nomeMeta,funcoes:[],aprovado:false},{onConflict:'usuario_id'}); } catch(e){ console.warn('auto-create prof:',e.message); }
 try { const r2 = await sb.from('profissionais').select('*').eq('usuario_id',CURRENT_USER.id).maybeSingle(); data = r2?.data || null; } catch(e){ data = null; }
 CURRENT_PROFILE = data;
 }
@@ -5600,9 +5649,15 @@ function renderCardAprovacao(p){
 const membroDesde = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—';
 const analise = p.analise_curriculo_json;
 const nota = p.nota_curriculo != null ? parseFloat(p.nota_curriculo).toFixed(1) : null;
-const selo = p.selo_curriculo || null;
-const seloCor = { 'Iniciante':'#6B7280', 'Experiente':'#3B9EFF', 'Sênior':'#059669', 'Especialista':'#F59E0B' };
-const cor = selo ? (seloCor[selo]||'#6B7280') : '#D1D5DB';
+// Cor por faixa de nota (não é patente, é só visual)
+let corNota = '#6B7280';
+if(nota){
+const n = parseFloat(nota);
+if(n >= 4.5) corNota = '#F59E0B';
+else if(n >= 3.5) corNota = '#059669';
+else if(n >= 2.5) corNota = '#3B9EFF';
+else corNota = '#6B7280';
+}
 const iniciais = (p.nome||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
 let blocoAnalise = '';
 if(analise){
@@ -5610,8 +5665,8 @@ const pontosFortes = (analise.pontos_fortes||[]).map(x=>`<div style="font-size:1
 const pontosAtencao = (analise.pontos_atencao||[]).map(x=>`<div style="font-size:11px;padding:3px 0;color:#B45309">⚠ ${x}</div>`).join('');
 blocoAnalise = `<div style="background:#F9FAFB;border-radius:10px;padding:12px;margin-top:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:${cor}">${nota}</div>
-<div style="background:${cor}22;color:${cor};font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.5px">${selo.toUpperCase()}</div>
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:${corNota}">${nota}</div>
+<div style="font-size:10px;color:var(--gray);font-weight:700;letter-spacing:.4px">NOTA DE CADASTRO (PROVISÓRIA)</div>
 </div>
 <div style="font-size:12px;color:var(--gray);font-style:italic;margin-bottom:8px">"${analise.resumo||''}"</div>
 ${pontosFortes}${pontosAtencao}
@@ -6473,6 +6528,53 @@ if(status === 'SUBSCRIBED'){
 }
 // ─── REALTIME PROFISSIONAL ────────────────────────────
 // ─── CONTRATAÇÕES DO PROFISSIONAL ────────────────────────────
+function atualizarBannerPerfilIncompleto(){
+const banner = document.getElementById('banner-perfil-incompleto-prof');
+if(!banner) return;
+if(loginType !== 'prof' || !CURRENT_PROFILE){ banner.style.display = 'none'; return; }
+const p = CURRENT_PROFILE;
+const faltando = !(p.experiencia_texto?.trim()) || !(p.locais_trabalhados?.trim()) || !(p.referencia_nome?.trim()) || !(p.referencia_telefone?.trim());
+banner.style.display = faltando ? 'block' : 'none';
+}
+function abrirCompletarPerfil(){
+const p = CURRENT_PROFILE || {};
+const el = id => document.getElementById(id);
+if(el('modal-perfil-experiencia')) el('modal-perfil-experiencia').value = p.experiencia_texto || '';
+if(el('modal-perfil-locais'))      el('modal-perfil-locais').value      = p.locais_trabalhados || '';
+if(el('modal-perfil-ref-nome'))    el('modal-perfil-ref-nome').value    = p.referencia_nome || '';
+if(el('modal-perfil-ref-tel'))     el('modal-perfil-ref-tel').value     = p.referencia_telefone || '';
+openModal('modal-completar-perfil');
+}
+async function salvarCompletarPerfil(){
+if(!CURRENT_PROFILE?.id) return;
+const experiencia = (document.getElementById('modal-perfil-experiencia')?.value || '').trim();
+const locais      = (document.getElementById('modal-perfil-locais')?.value || '').trim();
+const refNome     = (document.getElementById('modal-perfil-ref-nome')?.value || '').trim();
+const refTel      = (document.getElementById('modal-perfil-ref-tel')?.value || '').replace(/\D/g,'');
+if(experiencia.length < 50){ showToast('Escreva pelo menos 50 caracteres na experiência.'); return; }
+if(locais.length < 10){ showToast('Informe pelo menos um local.'); return; }
+if(refNome.length < 3){ showToast('Informe o nome da referência.'); return; }
+if(refTel.length < 10){ showToast('Informe um telefone válido com DDD.'); return; }
+const btn = document.getElementById('btn-salvar-perfil-completo');
+if(btn){ btn.disabled = true; btn.textContent = 'Salvando...'; }
+try {
+const { error } = await sb.from('profissionais').update({
+experiencia_texto: experiencia,
+locais_trabalhados: locais,
+referencia_nome: refNome,
+referencia_telefone: refTel
+}).eq('id', CURRENT_PROFILE.id);
+if(error){ showToast('Erro: ' + error.message); return; }
+CURRENT_PROFILE.experiencia_texto = experiencia;
+CURRENT_PROFILE.locais_trabalhados = locais;
+CURRENT_PROFILE.referencia_nome = refNome;
+CURRENT_PROFILE.referencia_telefone = refTel;
+closeModal('modal-completar-perfil');
+atualizarBannerPerfilIncompleto();
+showToast('✓ Perfil atualizado');
+} catch(e){ showToast('Erro: ' + e.message); }
+finally { if(btn){ btn.disabled = false; btn.textContent = 'Salvar'; } }
+}
 async function atualizarBannerFaltas(){
 const banner = document.getElementById('banner-faltas-prof');
 if(!banner || !CURRENT_PROFILE || loginType !== 'prof'){ if(banner) banner.style.display='none'; return; }
@@ -6548,6 +6650,7 @@ CONTRATACOES_PROF = [];
 } catch(e){ console.warn('carregarContratacoesBanco:', e.message); }
 renderContratacoesProfHome();
 atualizarBannerFaltas();
+atualizarBannerPerfilIncompleto();
 }
 // Intervalo global da contagem regressiva
 function renderContratacoesProfHome(){
@@ -7454,6 +7557,70 @@ await carregarRankingBanco();
 if(btn){ btn.textContent = 'Salvar e continuar →'; btn.disabled = false; }
 onbProximo();
 }
+// ─── VALIDAÇÃO EM TEMPO REAL ─────────────────────────────
+function onbCharCount(campo, textarea){
+const val = (textarea.value || '').trim();
+const min = campo === 'experiencia' ? 50 : 10;
+const countEl = document.getElementById(`onb-${campo}-count`);
+const btn = document.getElementById(campo === 'experiencia' ? 'onb-btn-exp' : 'onb-btn-loc');
+if(countEl){
+const ok = val.length >= min;
+countEl.textContent = ok ? `✓ ${val.length} caracteres` : `${val.length} / ${min} caracteres mínimos`;
+countEl.style.color = ok ? '#10B981' : 'rgba(255,255,255,.4)';
+}
+if(btn) btn.disabled = val.length < min;
+}
+function onbValidarReferencia(){
+const nome = (document.getElementById('onb-ref-nome')?.value || '').trim();
+const tel  = (document.getElementById('onb-ref-telefone')?.value || '').replace(/\D/g,'');
+const btn  = document.getElementById('onb-btn-ref');
+if(btn) btn.disabled = !(nome.length >= 3 && tel.length >= 10);
+}
+async function onbSalvarExperiencia(){
+const val = (document.getElementById('onb-experiencia')?.value || '').trim();
+if(val.length < 50){ showToast('Escreva pelo menos 50 caracteres.'); return; }
+const btn = document.getElementById('onb-btn-exp');
+if(btn){ btn.textContent = 'Salvando...'; btn.disabled = true; }
+try {
+if(CURRENT_PROFILE?.id){
+await sb.from('profissionais').update({ experiencia_texto: val }).eq('id', CURRENT_PROFILE.id);
+CURRENT_PROFILE.experiencia_texto = val;
+}
+onbProximo();
+} catch(e){ showToast('Erro: ' + e.message); }
+finally { if(btn){ btn.textContent = 'Continuar →'; btn.disabled = false; } }
+}
+async function onbSalvarLocais(){
+const val = (document.getElementById('onb-locais')?.value || '').trim();
+if(val.length < 10){ showToast('Informe pelo menos um local.'); return; }
+const btn = document.getElementById('onb-btn-loc');
+if(btn){ btn.textContent = 'Salvando...'; btn.disabled = true; }
+try {
+if(CURRENT_PROFILE?.id){
+await sb.from('profissionais').update({ locais_trabalhados: val }).eq('id', CURRENT_PROFILE.id);
+CURRENT_PROFILE.locais_trabalhados = val;
+}
+onbProximo();
+} catch(e){ showToast('Erro: ' + e.message); }
+finally { if(btn){ btn.textContent = 'Continuar →'; btn.disabled = false; } }
+}
+async function onbSalvarReferencia(){
+const nome = (document.getElementById('onb-ref-nome')?.value || '').trim();
+const tel  = (document.getElementById('onb-ref-telefone')?.value || '').replace(/\D/g,'');
+if(nome.length < 3){ showToast('Informe o nome da referência.'); return; }
+if(tel.length < 10){ showToast('Informe um telefone válido com DDD.'); return; }
+const btn = document.getElementById('onb-btn-ref');
+if(btn){ btn.textContent = 'Salvando...'; btn.disabled = true; }
+try {
+if(CURRENT_PROFILE?.id){
+await sb.from('profissionais').update({ referencia_nome: nome, referencia_telefone: tel }).eq('id', CURRENT_PROFILE.id);
+CURRENT_PROFILE.referencia_nome = nome;
+CURRENT_PROFILE.referencia_telefone = tel;
+}
+onbProximo();
+} catch(e){ showToast('Erro: ' + e.message); }
+finally { if(btn){ btn.textContent = 'Finalizar cadastro →'; btn.disabled = false; } }
+}
 async function onbConcluir(){
 // Marca onboarding concluído no metadata para não mostrar novamente
 try { await sb.auth.updateUser({ data: { onboarding_concluido: true } }); } catch(e){}
@@ -7748,6 +7915,35 @@ async function enviarAvaliacaoEmpresa(){
 <button class="modal-close" onclick="closeModal('modal-relatorio-evento')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
 </div>
 <div class="modal-body" id="relatorio-body">
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="modal-completar-perfil">
+<div class="modal" style="max-height:90vh;overflow-y:auto">
+<div class="modal-handle"></div>
+<div class="modal-head">
+<div class="modal-title">📝 Complete seu perfil</div>
+<button class="modal-close" onclick="closeModal('modal-completar-perfil')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+<div class="modal-body">
+<div style="font-size:12px;color:var(--gray);margin-bottom:14px;line-height:1.5">Empresas veem essas informações antes de contratar. Quanto mais completo, mais oportunidades.</div>
+<div style="margin-bottom:14px">
+<div style="font-size:11px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin-bottom:6px">SUA EXPERIÊNCIA</div>
+<textarea id="modal-perfil-experiencia" placeholder="Ex: Sou garçom há 4 anos. Trabalhei em casamentos, coquetéis corporativos..." style="width:100%;min-height:120px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.5;font-family:inherit;resize:vertical"></textarea>
+</div>
+<div style="margin-bottom:14px">
+<div style="font-size:11px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin-bottom:6px">ONDE JÁ TRABALHOU</div>
+<textarea id="modal-perfil-locais" placeholder="Ex: Buffet Real, Casa Grande Eventos, Restaurante Xapuri" style="width:100%;min-height:70px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;line-height:1.5;font-family:inherit;resize:vertical"></textarea>
+</div>
+<div style="margin-bottom:10px">
+<div style="font-size:11px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin-bottom:6px">REFERÊNCIA — NOME</div>
+<input type="text" id="modal-perfil-ref-nome" placeholder="Ex: Ana Paula Souza" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;font-family:inherit">
+</div>
+<div style="margin-bottom:18px">
+<div style="font-size:11px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin-bottom:6px">REFERÊNCIA — TELEFONE</div>
+<input type="tel" id="modal-perfil-ref-tel" placeholder="Ex: 34999887766" maxlength="11" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;font-family:inherit">
+</div>
+<button class="btn btn-primary btn-block" id="btn-salvar-perfil-completo" onclick="salvarCompletarPerfil()">Salvar</button>
 </div>
 </div>
 </div>
