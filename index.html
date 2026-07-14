@@ -330,7 +330,7 @@ border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;
 font-family:'Sora',sans-serif;font-weight:800;font-size:18px;width:28px;
 text-align:center;flex-shrink:0;
 }
-.n1{color:var(--gold)}.n2{color:#9CA3AF}.n3{color:#CD7F32}.nX{color:rgba(11,31,58,.2)}
+.n1{color:var(--gold)}.n2{color:#9CA3AF}.n3{color:#CD7F32}.nX{color:#6B7280}
 .rank-avatar{
 width:44px;height:44px;border-radius:50%;
 display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;font-family:'Sora',sans-serif;flex-shrink:0;
@@ -2818,7 +2818,7 @@ const meMark = p.me?' <span class="badge badge-blue" style="font-size:9px;paddin
 const novoBadge = (p.ev < 3 && p.notaCurriculo > 0)
 ? ` <span class="badge" style="font-size:9px;padding:2px 6px;background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.25);margin-left:4px">🆕 IA ${p.notaCurriculo.toFixed(1)}</span>`
 : '';
-return `<div class="rank-item" style="${p.nota<3?'opacity:.5':''}">
+return `<div class="rank-item" style="${(p.ev >= 3 && p.nota < 3 && p.nota > 0) ? 'opacity:.55' : ''}">
 <div class="rank-num ${cls}">${pos}</div>
 <div class="rank-avatar" style="background:${p.bg}">${p.av}</div>
 <div class="rank-info">
@@ -2843,7 +2843,7 @@ const cls = pos===1?'n1':pos===2?'n2':pos===3?'n3':'nX';
 const novoBadge = (p.ev < 3 && p.notaCurriculo > 0)
 ? ` <span class="badge" style="font-size:9px;padding:2px 6px;background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.25);margin-left:4px">🆕 IA ${p.notaCurriculo.toFixed(1)}</span>`
 : '';
-return `<div class="rank-item" style="${p.nota<3?'opacity:.5':''};cursor:pointer" data-prof-id="${p.profissional_id||''}" onclick="if(this.dataset.profId)abrirPerfilPublico(this.dataset.profId)">
+return `<div class="rank-item" style="${(p.ev >= 3 && p.nota < 3 && p.nota > 0) ? 'opacity:.55' : ''};cursor:pointer" data-prof-id="${p.profissional_id||''}" onclick="if(this.dataset.profId)abrirPerfilPublico(this.dataset.profId)">
 <div class="rank-num ${cls}">${pos}</div>
 <div class="rank-avatar" style="background:${p.bg}">${p.av}</div>
 <div class="rank-info">
