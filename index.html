@@ -908,10 +908,20 @@ body{background:#D8E3F5;min-height:100vh}
 <div class="topbar">
 <button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
 <div class="sec-title" style="font-size:17px">🛡️ Disputas pendentes</div>
-<div></div>
+<button class="icon-btn" onclick="goTo('screen-admin-aprovacao')" title="Aprovações pendentes"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></button>
 </div>
 <div class="scroll-content">
 <div id="lista-disputas-admin" style="padding:14px 20px 24px"><div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div></div>
+</div>
+</div>
+<div class="screen" id="screen-admin-aprovacao">
+<div class="topbar">
+<button class="icon-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+<div class="sec-title" style="font-size:17px">🎓 Aprovações</div>
+<button class="icon-btn" onclick="goTo('screen-disputas-admin')" title="Disputas pendentes"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></button>
+</div>
+<div class="scroll-content">
+<div id="lista-aprovacao-admin" style="padding:14px 20px 24px"><div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div></div>
 </div>
 </div>
 <div class="screen" id="screen-notif">
@@ -1870,6 +1880,7 @@ if(id === 'screen-perfil'){ renderConquistas(); renderRatingBars(); renderPlanoA
 if(id === 'screen-notif' || id === 'screen-notif-emp') renderNotificacoesTela(id);
 if(id === 'screen-faltas-prof') carregarFaltasProfDetalhado();
 if(id === 'screen-disputas-admin') carregarDisputasPendentes();
+if(id === 'screen-admin-aprovacao') carregarProfsPendentes();
 if(id === 'screen-perfil' || id === 'screen-perfil-emp') atualizarLinkAdminPerfil();
 }
 function goTo(id, isBack){
@@ -5559,6 +5570,126 @@ await carregarDisputasPendentes();
 } finally {
 if(btnA) btnA.disabled = false;
 if(btnR) btnR.disabled = false;
+}
+}
+// ─── ADMIN: APROVAÇÃO DE PROFISSIONAIS ─────────────────────
+async function carregarProfsPendentes(){
+const lista = document.getElementById('lista-aprovacao-admin');
+if(!lista) return;
+if(!isAdmin()){
+lista.innerHTML = '<div style="text-align:center;color:var(--red);font-size:13px;padding:40px 20px">Acesso restrito.</div>';
+return;
+}
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">Carregando...</div>';
+try {
+const { data, error } = await sb.from('profissionais')
+.select('id, nome, cpf, funcoes, experiencia_texto, locais_trabalhados, referencia_nome, referencia_telefone, nota_curriculo, selo_curriculo, analise_curriculo_json, analise_curriculo_em, aprovado, created_at')
+.eq('aprovado', false)
+.order('created_at', { ascending: false });
+if(error){ lista.innerHTML = `<div style="text-align:center;color:var(--red);font-size:12px;padding:40px 20px">Erro: ${error.message}</div>`; return; }
+if(!data || !data.length){
+lista.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:40px 20px">✅ Nenhuma aprovação pendente.</div>';
+return;
+}
+lista.innerHTML = data.map(p => renderCardAprovacao(p)).join('');
+} catch(e){
+lista.innerHTML = `<div style="text-align:center;color:var(--red);font-size:12px;padding:40px 20px">Erro: ${e.message}</div>`;
+}
+}
+function renderCardAprovacao(p){
+const membroDesde = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—';
+const analise = p.analise_curriculo_json;
+const nota = p.nota_curriculo != null ? parseFloat(p.nota_curriculo).toFixed(1) : null;
+const selo = p.selo_curriculo || null;
+const seloCor = { 'Iniciante':'#6B7280', 'Experiente':'#3B9EFF', 'Sênior':'#059669', 'Especialista':'#F59E0B' };
+const cor = selo ? (seloCor[selo]||'#6B7280') : '#D1D5DB';
+const iniciais = (p.nome||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+let blocoAnalise = '';
+if(analise){
+const pontosFortes = (analise.pontos_fortes||[]).map(x=>`<div style="font-size:11px;padding:3px 0">✓ ${x}</div>`).join('');
+const pontosAtencao = (analise.pontos_atencao||[]).map(x=>`<div style="font-size:11px;padding:3px 0;color:#B45309">⚠ ${x}</div>`).join('');
+blocoAnalise = `<div style="background:#F9FAFB;border-radius:10px;padding:12px;margin-top:12px;border:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+<div style="font-family:'Sora',sans-serif;font-weight:800;font-size:22px;color:${cor}">${nota}</div>
+<div style="background:${cor}22;color:${cor};font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.5px">${selo.toUpperCase()}</div>
+</div>
+<div style="font-size:12px;color:var(--gray);font-style:italic;margin-bottom:8px">"${analise.resumo||''}"</div>
+${pontosFortes}${pontosAtencao}
+</div>`;
+} else {
+blocoAnalise = `<div style="background:#F9FAFB;border-radius:10px;padding:12px;margin-top:12px;border:1px dashed var(--border);text-align:center;font-size:12px;color:var(--gray)">Sem análise ainda. Clique em <b>Analisar com IA</b> para gerar.</div>`;
+}
+const btnAnalise = analise
+? `<button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;border:1px solid var(--border)" onclick="analisarProfComIA('${p.id}', this)">🔄 Reanalisar</button>`
+: `<button class="btn btn-primary btn-sm" style="flex:1;font-size:11px" onclick="analisarProfComIA('${p.id}', this)">✨ Analisar com IA</button>`;
+return `<div class="card" style="padding:14px;margin-bottom:14px">
+<div style="display:flex;align-items:flex-start;gap:10px">
+<div class="avatar-btn" style="width:38px;height:38px;font-size:14px;background:linear-gradient(135deg,#3B9EFF,#2563EB);flex-shrink:0">${iniciais}</div>
+<div style="flex:1;min-width:0">
+<div style="font-family:'Sora',sans-serif;font-weight:700;font-size:14px">${p.nome||'—'}</div>
+<div style="font-size:11px;color:var(--gray);margin-top:2px">CPF ${p.cpf||'—'} · Cadastro em ${membroDesde}</div>
+<div style="font-size:11px;color:var(--gray);margin-top:2px"><b>Funções:</b> ${(p.funcoes||[]).join(', ')||'(nenhuma)'}</div>
+</div>
+</div>
+<div style="margin-top:10px;font-size:12px;line-height:1.5">
+<div style="margin-bottom:6px"><b style="color:var(--gray);font-size:10px;letter-spacing:.5px">EXPERIÊNCIA</b><br>${p.experiencia_texto||'<span style="color:var(--gray);font-style:italic">(não informado)</span>'}</div>
+<div style="margin-bottom:6px"><b style="color:var(--gray);font-size:10px;letter-spacing:.5px">LOCAIS</b><br>${p.locais_trabalhados||'<span style="color:var(--gray);font-style:italic">(não informado)</span>'}</div>
+<div><b style="color:var(--gray);font-size:10px;letter-spacing:.5px">REFERÊNCIA</b><br>${p.referencia_nome||'—'} ${p.referencia_telefone?`· ${p.referencia_telefone}`:''}</div>
+</div>
+${blocoAnalise}
+<div style="display:flex;gap:6px;margin-top:12px">
+${btnAnalise}
+<button class="btn btn-primary btn-sm" style="flex:1;font-size:11px;background:#059669" onclick="aprovarProf('${p.id}', this)">✅ Aprovar</button>
+<button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;border:1px solid #DC2626;color:#DC2626" onclick="reprovarProf('${p.id}', this)">✕ Reprovar</button>
+</div>
+</div>`;
+}
+async function analisarProfComIA(profId, btn){
+if(!isAdmin()){ showToast('Acesso restrito'); return; }
+if(btn){ btn.disabled = true; btn.textContent = '⏳ Analisando...'; }
+try {
+const { data, error } = await sb.functions.invoke('analise-curriculo', { body: { profissional_id: profId } });
+if(error){ showToast('Erro: ' + (error.message||'falha na análise')); return; }
+if(!data?.ok){ showToast('Erro: ' + (data?.erro||'resposta inválida')); return; }
+showToast('✨ Análise concluída');
+await carregarProfsPendentes();
+} catch(e){
+showToast('Erro: ' + e.message);
+} finally {
+if(btn){ btn.disabled = false; }
+}
+}
+async function aprovarProf(profId, btn){
+if(!isAdmin()){ showToast('Acesso restrito'); return; }
+if(!confirm('Aprovar este profissional? Ele passará a aparecer nas buscas de empresas.')) return;
+if(btn){ btn.disabled = true; btn.textContent = '...'; }
+try {
+const { error } = await sb.from('profissionais').update({ aprovado: true }).eq('id', profId);
+if(error){ showToast('Erro: ' + error.message); return; }
+showToast('✅ Profissional aprovado');
+await carregarProfsPendentes();
+} catch(e){
+showToast('Erro: ' + e.message);
+} finally {
+if(btn){ btn.disabled = false; }
+}
+}
+async function reprovarProf(profId, btn){
+if(!isAdmin()){ showToast('Acesso restrito'); return; }
+const motivo = prompt('Motivo da reprovação (opcional, só admin verá):');
+if(motivo === null) return; // cancelou
+if(btn){ btn.disabled = true; btn.textContent = '...'; }
+try {
+// Marca como reprovado guardando o motivo dentro do analise_curriculo_json
+const { data: atual } = await sb.from('profissionais').select('analise_curriculo_json').eq('id', profId).maybeSingle();
+const novoJson = { ...(atual?.analise_curriculo_json||{}), reprovado_em: new Date().toISOString(), motivo_reprovacao: motivo };
+await sb.from('profissionais').update({ aprovado: false, analise_curriculo_json: novoJson }).eq('id', profId);
+showToast('✕ Profissional reprovado');
+await carregarProfsPendentes();
+} catch(e){
+showToast('Erro: ' + e.message);
+} finally {
+if(btn){ btn.disabled = false; }
 }
 }
 function classificarPresencaSaiu(contId, vagaId, profId){
