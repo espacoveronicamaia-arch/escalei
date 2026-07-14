@@ -2228,18 +2228,12 @@ await carregarNotaEmpresa();
 await carregarNotificacoesBanco();
 goTo('screen-home-emp');
 // Carrega contratacao_ids que a empresa ja avaliou
-// Busca via avaliacoes_visiveis com security_invoker=false (evita erro 500 do RLS)
+// Usa RPC minhas_avaliacoes_feitas (bypassa janela cega — autor sempre vê as próprias)
 AVALIACOES_EMP_FEITAS.clear();
 try {
-const todosContIds = Object.values(VAGAS).flatMap(v => Object.values(v._contratacaoIdByProf||{}));
-if(todosContIds.length){
-const { data: avsFeitas, error: errAvs } = await sb
-.from('avaliacoes_visiveis')
-.select('contratacao_id, avaliador_tipo')
-.eq('avaliador_tipo', 'empresa');
+const { data: avsFeitas, error: errAvs } = await sb.rpc('minhas_avaliacoes_feitas', { p_tipo: 'empresa' });
 if(errAvs) throw new Error(errAvs.message);
 (avsFeitas||[]).forEach(a => AVALIACOES_EMP_FEITAS.add(a.contratacao_id));
-}
 } catch(e){ console.warn('avaliacoes emp feitas:', e.message); }
 renderRankingEmp('Garçom'); renderTopProfEmp('Garçom'); renderCandidatos(); renderEmpHistorico();
 renderStatsEmpresa();
@@ -6331,16 +6325,10 @@ const prazo = new Date(fim.getTime() + 72 * 3600000);
 return agora> fim && agora < prazo;
 });
 // Verifica quais ja tem avaliacao enviada pelo lado profissional
-// (avaliador_id nao existe na tabela — usa avaliador_tipo='profissional'
-//  que e unico por contratacao via constraint UNIQUE)
+// Usa RPC minhas_avaliacoes_feitas (bypassa janela cega)
 if(!pendentes.length) return;
-// Usa avaliacoes_visiveis (security_invoker=false) para evitar erro 500 da policy
-// Busca todas as avaliacoes do tipo profissional e filtra no cliente
 const ids = new Set(pendentes.map(c => c.id));
-const { data: jaAvaliou } = await sb
-.from('avaliacoes_visiveis')
-.select('contratacao_id')
-.eq('avaliador_tipo', 'profissional');
+const { data: jaAvaliou } = await sb.rpc('minhas_avaliacoes_feitas', { p_tipo: 'profissional' });
 const jaAvaliouIds = new Set((jaAvaliou || [])
 .filter(a => ids.has(a.contratacao_id))
 .map(a => a.contratacao_id));
@@ -6647,7 +6635,7 @@ CONTRATACOES_PROF = ativos.map(c => ({ ...c, vagaDetalhes: vagasMap[c.vaga_id]||
 // Busca quais contratações o prof já avaliou (para esconder botão Avaliar empresa)
 try {
 const idsSet = new Set(CONTRATACOES_PROF.map(c => c.id));
-const { data: avFeitas } = await sb.from('avaliacoes_visiveis').select('contratacao_id').eq('avaliador_tipo','profissional');
+const { data: avFeitas } = await sb.rpc('minhas_avaliacoes_feitas', { p_tipo: 'profissional' });
 AVALIACOES_EMP_FEITAS_PROF.clear();
 (avFeitas||[]).forEach(a => { if(idsSet.has(a.contratacao_id)) AVALIACOES_EMP_FEITAS_PROF.add(a.contratacao_id); });
 } catch(e){ console.warn('avFeitas prof:', e.message); }
